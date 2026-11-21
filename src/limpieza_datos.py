@@ -747,7 +747,7 @@ def unificar_encuestas(partes, dim_empresa):
 def construir_personas(asistencia, encuestas, ruta_principal):
     t = "dim_persona"
     a = asistencia[["persona_id", "empresa_id", "nivel_cargo", "autoriza_datos"]].dropna(subset=["persona_id"])
-    e = encuestas[["persona_id", "empresa_id"]].dropna(subset=["persona_id", "empresa_id"]).assign(nivel_cargo="Sin dato", autoriza_datos="Sin dato")
+    e = encuestas[["persona_id", "empresa_id"]].dropna(subset=["persona_id"])  # incluye personas sin empresa identificada.assign(nivel_cargo="Sin dato", autoriza_datos="Sin dato")
     pr = pd.read_excel(ruta_principal)
     pr.columns = ["empresa_id", "ciudad", "nivel_cargo", "persona_id"]
     pr["empresa_id"] = validar_id(pr["empresa_id"], RX_ID_EMPRESA, t, "empresa_id")

@@ -1,0 +1,18 @@
+# PostgreSQL local para el proyecto (opcional). Requiere Docker Desktop.
+#   Encender:  docker compose up -d
+#   Apagar:    docker compose down
+# Coincide con la conexión de .env.ejemplo.
+services:
+  postgres:
+    image: postgres:16
+    container_name: actho-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: actho
+    ports:
+      - "5432:5432"
+    volumes:
+      - actho_pgdata:/var/lib/postgresql/data
+volumes:
+  actho_pgdata:

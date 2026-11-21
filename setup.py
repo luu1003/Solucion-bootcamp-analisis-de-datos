@@ -9,7 +9,8 @@ Deja el proyecto listo para correr en cualquier equipo (macOS, Windows o Linux):
   3. Instala las librerías de requirements.txt (solo si cambiaron).
   4. Configura VS Code para usar ese entorno.
   5. Verifica que estén los archivos de la carpeta Datos/.
-  6. Ejecuta los pasos del proyecto (ver PASOS), salvo que pidas solo instalar.
+  6. Ejecuta los pasos del proyecto (ver PASOS), salvo que pidas solo instalar:
+     limpieza de datos y, si hay conexión configurada en .env, carga a PostgreSQL.
 
 Uso (desde la carpeta del proyecto):
     macOS / Linux:  python3 setup.py
@@ -19,6 +20,12 @@ Opciones:
     --solo-instalar            prepara el entorno y no ejecuta el proyecto
     --reinstalar               borra y vuelve a crear .venv desde cero
     --fecha-corte AAAA-MM-DD   fecha de corte para la limpieza (por defecto, hoy)
+    --sin-postgres             no cargar a PostgreSQL aunque haya conexión configurada
+
+PostgreSQL (opcional):
+    1. Ten un servidor PostgreSQL. Con Docker:  docker compose up -d
+    2. Copia .env.ejemplo como .env y revisa DATABASE_URL.
+    3. Corre de nuevo este archivo: crea el esquema 'actho' y carga las tablas.
 
 Solo usa la librería estándar de Python, así que corre antes de instalar nada.
 Este archivo se actualiza a medida que avanza el proyecto: los pasos nuevos se
@@ -60,6 +67,11 @@ PASOS = [
         "script": "src/limpieza_datos.py",
         "usa_fecha_corte": True,
         "requiere_datos": True,
+    },
+    {
+        "nombre": "Carga a PostgreSQL",
+        "script": "src/cargar_postgres.py",
+        "opcional_postgres": True,  # solo corre si hay conexión en .env o DATABASE_URL
     },
 ]
 
@@ -142,7 +154,7 @@ def instalar_librerias():
 
 def verificar_librerias():
     codigo = ("import importlib.metadata as m;"
-              "print(', '.join(f'{n} {m.version(n)}' for n in ['pandas','numpy','openpyxl']))")
+              "print(', '.join(f'{n} {m.version(n)}' for n in ['pandas','numpy','openpyxl','psycopg']))")
     r = ejecutar([PY_VENV, "-c", codigo], capture_output=True, text=True)
     if r.returncode != 0:
         fallar("Las librerías no quedaron instaladas correctamente.", "Corre:  python setup.py --reinstalar")
@@ -184,18 +196,41 @@ def verificar_datos():
     return True
 
 
-def correr_pasos(fecha_corte, hay_datos):
+def hay_conexion_postgres():
+    if os.environ.get("DATABASE_URL") or (os.environ.get("PGDATABASE") and os.environ.get("PGUSER")):
+        return True
+    env = RAIZ / ".env"
+    if env.exists():
+        for linea in env.read_text(encoding="utf-8").splitlines():
+            if linea.strip().startswith(("DATABASE_URL=", "PGDATABASE=")) and linea.split("=", 1)[1].strip():
+                return True
+    return False
+
+
+def correr_pasos(fecha_corte, hay_datos, sin_postgres=False):
     entorno = dict(os.environ, PYTHONIOENCODING="utf-8")
     for n, paso in enumerate(PASOS, 1):
         titulo = f"Paso {n}/{len(PASOS)}: {paso['nombre']}"
         if paso.get("requiere_datos") and not hay_datos:
             aviso(f"{titulo} — omitido (faltan datos).")
             continue
+        if paso.get("opcional_postgres"):
+            if sin_postgres:
+                aviso(f"{titulo} — omitido (--sin-postgres).")
+                continue
+            if not hay_conexion_postgres():
+                aviso(f"{titulo} — omitido: no hay conexión configurada. Copia .env.ejemplo como .env "
+                      "(y si usas Docker: docker compose up -d).")
+                continue
         info(titulo)
         cmd = [PY_VENV, paso["script"]]
         if paso.get("usa_fecha_corte") and fecha_corte:
             cmd += ["--fecha-corte", fecha_corte]
         if ejecutar(cmd, env=entorno).returncode != 0:
+            if paso.get("opcional_postgres"):
+                aviso("La carga a PostgreSQL no se completó (mira el mensaje de arriba). "
+                      "Los CSV limpios siguen disponibles en salida/.")
+                continue
             fallar(f"El paso '{paso['nombre']}' terminó con error.")
         ok(f"{paso['nombre']} terminado")
 
@@ -209,6 +244,7 @@ def main():
     ap.add_argument("--solo-instalar", action="store_true", help="no ejecutar los pasos del proyecto")
     ap.add_argument("--reinstalar", action="store_true", help="borrar y recrear .venv")
     ap.add_argument("--fecha-corte", default=None, help="AAAA-MM-DD")
+    ap.add_argument("--sin-postgres", action="store_true", help="no cargar a PostgreSQL")
     args = ap.parse_args()
 
     print("\n=== Preparación del proyecto ACTHO ===\n")
@@ -222,7 +258,7 @@ def main():
 
     if not args.solo_instalar:
         print()
-        correr_pasos(args.fecha_corte, hay_datos)
+        correr_pasos(args.fecha_corte, hay_datos, args.sin_postgres)
 
     activar = r".venv\Scripts\activate" if ES_WINDOWS else "source .venv/bin/activate"
     print(f"\nListo. Para trabajar a mano:  {activar}   y luego   python src/limpieza_datos.py")

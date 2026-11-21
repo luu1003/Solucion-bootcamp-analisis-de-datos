@@ -36,6 +36,7 @@ outputs/
 # Credenciales y configuración con secretos
 .env
 .env.*
+!.env.ejemplo
 *.key
 *.pem
 credentials*.json
