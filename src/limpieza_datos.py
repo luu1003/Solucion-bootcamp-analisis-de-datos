@@ -30,9 +30,15 @@ import unicodedata
 import warnings
 from pathlib import Path
 
-import numpy as np
-import openpyxl
-import pandas as pd
+try:
+    import numpy as np
+    import openpyxl
+    import pandas as pd
+except ModuleNotFoundError as e:  # mensaje claro si falta una librería
+    raise SystemExit(
+        f"Falta la librería '{e.name}' en este Python ({__import__('sys').executable}).\n"
+        f"Instálala con:  {__import__('sys').executable} -m pip install -r requirements.txt"
+    )
 
 warnings.filterwarnings("ignore")
 

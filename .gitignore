@@ -1,13 +1,59 @@
-# Datos del reto (confidenciales: NDA, uso exclusivo para el reto). No subir a GitHub.
+# ══════════════════════════════════════════════════════════════════════════════
+# DATOS DEL RETO: nunca subir a GitHub (confidenciales, NDA, uso exclusivo del reto)
+# ══════════════════════════════════════════════════════════════════════════════
+# Carpetas de datos (originales y resultados del procesamiento)
 Datos/
+datos/
+data/
 salida/
+output/
+outputs/
 
-# Sistema y temporales de Office
+# Cualquier archivo de datos o documento del reto, esté en la carpeta que esté
+*.xlsx
+*.xls
+*.xlsm
+*.xlsb
+*.csv
+*.tsv
+*.parquet
+*.feather
+*.json.gz
+*.pdf
+*.doc
+*.docx
+*.ppt
+*.pptx
+*.zip
+*.7z
+*.rar
+*.db
+*.sqlite
+*.sqlite3
+*.pkl
+*.pickle
+
+# Credenciales y configuración con secretos
+.env
+.env.*
+*.key
+*.pem
+credentials*.json
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Sistema, editores y temporales
+# ══════════════════════════════════════════════════════════════════════════════
 .DS_Store
+Thumbs.db
 ~$*
+*.tmp
+.vscode/
+.idea/
 
 # Python
 __pycache__/
 *.pyc
 .venv/
+venv/
 .ipynb_checkpoints/
+.pytest_cache/
