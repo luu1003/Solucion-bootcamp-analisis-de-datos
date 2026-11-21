@@ -898,7 +898,7 @@ Solo se evalúan las membresías vigentes (Activo, Pronto a expirar, Periodo de 
 
 **Límites conocidos:**
 
-- **Tasa de renovación aproximada.** Zoho sobrescribe la fecha de expiración al renovar y no guarda historial. Se cuentan como renovados los vigentes con más de un año de afiliación, y como no renovados los cancelados o expirados cuya expiración cayó en los últimos 12 meses. La solución de fondo es la foto mensual (`snapshot_membresia`, sección 6).
+- **Tasa de renovación aproximada.** Zoho sobrescribe la fecha de expiración al renovar y no guarda historial. Se cuentan como renovados los vigentes con más de un año de afiliación, y como no renovados los cancelados o expirados cuya expiración cayó en los últimos 12 meses. Desde ahora el DAG diario guarda una foto mensual (`historial.snapshot_membresia`), y `historial.v_movimientos_mensuales` mide las renovaciones reales a partir del segundo mes.
 - **NPS de eventos con pocas respuestas** (41). El NPS de ACTHO (encuesta de 90 días) queda conectado pero vacío.
 - **Detractores:** hoy no hay ninguno en los datos (la nota más baja es 8 en NPS y 3,25 en satisfacción), así que ese segmento aparece vacío.
 - **Evento de cada encuesta:** se infiere por fecha y modalidad. Se asignaron 304 de 778 respuestas. Las de 2025 no corresponden a eventos de 2026 y algunas fechas tienen dos eventos.
@@ -930,7 +930,7 @@ Requisitos: Python 3.9 o superior y, para la base de datos, PostgreSQL (o Docker
 ```bash
 # 1. Copiar el paquete del reto en la carpeta Datos/ (no se sube a GitHub)
 # 2. Base de datos local con Docker (opcional si ya tienes PostgreSQL)
-docker compose up -d
+docker compose up -d postgres  # o "docker compose up -d" para incluir Airflow (7.9)
 cp .env.ejemplo .env          # ajustar DATABASE_URL si hace falta
 # 3. Preparar todo y ejecutar
 python3 setup.py              # Windows: py setup.py
@@ -945,11 +945,96 @@ python3 setup.py              # Windows: py setup.py
 | `src/cargar_postgres.py` | Crea el esquema, carga las tablas y ejecuta las vistas |
 | `sql/esquema.sql` | DDL generado (tablas, llaves, comentarios, índices) |
 | `sql/vistas_dashboard.sql` | Parámetros y vistas del tablero |
-| `docker-compose.yml`, `.env.ejemplo` | PostgreSQL local y plantilla de conexión |
+| `docker-compose.yml`, `.env.ejemplo` | PostgreSQL y Airflow locales, y plantilla de conexión |
+| `src/ingesta_control.py` | Huellas, detección de cambios, validación, verificación, recálculo e historial |
+| `sql/control.sql` | Esquemas persistentes `ingesta` e `historial` |
+| `pipelines/airflow/dags/` | DAG `actho_ingesta_datos` y `actho_recalculo_riesgo_diario` (ver 7.9) |
 
 `Datos/`, `salida/`, `.env` y cualquier `.xlsx`, `.csv` o `.pdf` están en `.gitignore`: los datos del reto nunca se suben al repositorio.
 
-### 7.9 Camino hacia la arquitectura objetivo
+### 7.9 Orquestación con Airflow
+
+La captura de los datos limpios en PostgreSQL la orquesta **Apache Airflow 3.4** con dos DAG en `pipelines/airflow/dags/`. La lógica vive en `src/ingesta_control.py`, que se puede probar y ejecutar sin Airflow. Los DAG solo ordenan los pasos.
+
+```mermaid
+flowchart LR
+    subgraph ING[actho_ingesta_datos · 5:30 a. m.]
+        A[verificar_fuentes<br/>SHA-256 de cada archivo] --> B{detectar_cambios}
+        B -- sin cambios --> Z([termina · sin_cambios])
+        B -- hay cambios o forzar --> C[iniciar_ejecucion]
+        C --> D[limpiar_datos] --> E[validar_capa_limpia] --> F[cargar_postgres]
+        F --> G[verificar_base] --> H[registrar_lotes]
+    end
+    subgraph RSG[actho_recalculo_riesgo_diario · 6:00 a. m.]
+        I[actualizar_semaforo<br/>fecha de corte = hoy] --> J[reportar_alertas<br/>nuevos en rojo]
+    end
+    H -- dispara --> I
+```
+
+**`actho_ingesta_datos`** (todos los días a las 5:30 a. m., hora de Bogotá, o a mano):
+
+| Tarea | Qué hace |
+| --- | --- |
+| `verificar_fuentes` | Comprueba que estén los 6 archivos de `Datos/` y calcula su huella SHA-256 |
+| `detectar_cambios` | Compara las huellas con la última carga (`ingesta.lote_carga`). Si nada cambió, termina sin procesar (*short-circuit*) |
+| `iniciar_ejecucion` | Abre el registro en `ingesta.ejecucion` con la fecha de corte y las fuentes que cambiaron |
+| `limpiar_datos` | Ejecuta `src/limpieza_datos.py` |
+| `validar_capa_limpia` | Antes de tocar la base revisa los CSV: llaves únicas y no vacías, relaciones sin huérfanos, notas y NPS en rango, mínimos de filas |
+| `cargar_postgres` | Ejecuta `src/cargar_postgres.py` (esquema, tablas y vistas en una transacción) |
+| `verificar_base` | Compara las filas de la base con los CSV y comprueba que `v_kpi_principal` responda |
+| `registrar_lotes` | Registra la huella de cada archivo procesado y cierra la ejecución como `procesado`, con filas e indicadores |
+| `recalcular_riesgo` | Dispara el DAG de recálculo |
+
+Parámetros para la ejecución manual: `forzar` (procesar aunque no haya cambios) y `fecha_corte` (AAAA-MM-DD).
+
+**`actho_recalculo_riesgo_diario`** (todos los días a las 6:00 a. m. y después de cada ingesta):
+
+- Mueve la fecha de corte a hoy, así los días para vencer y las ventanas de participación avanzan aunque no lleguen archivos nuevos.
+- Guarda el semáforo de cada empresa vigente en `historial.evaluacion_riesgo`, con la huella de los parámetros usados (`version_reglas`).
+- Guarda la foto del mes de cada membresía en `historial.snapshot_membresia`.
+- Reporta las empresas que pasaron a **rojo** desde la evaluación anterior. Aquí se conectará la notificación a la ejecutiva (sección 9.2).
+
+**Esquemas persistentes** (`sql/control.sql`). A diferencia de `actho`, que se recrea en cada carga, estos **no se borran**:
+
+| Tabla o vista | Contenido |
+| --- | --- |
+| `ingesta.ejecucion` | Cada corrida: inicio, fin, estado (`procesado`, `sin_cambios`, `con_errores`), fuentes cambiadas, filas, indicadores o error |
+| `ingesta.lote_carga` | Cada archivo procesado con su huella SHA-256 (no se registra dos veces el mismo archivo) |
+| `historial.evaluacion_riesgo` | Semáforo, puntaje por componente y motivos por empresa y fecha de corte |
+| `historial.snapshot_membresia` | Foto mensual del estado y la expiración de cada membresía |
+| `historial.v_movimientos_mensuales` | Altas, retiros y **renovaciones medidas** entre fotos consecutivas. Desde el segundo mes reemplaza a la tasa de renovación aproximada |
+
+**Manejo de errores:**
+- Cada tarea se reintenta una vez.
+- Si una tarea falla, la ejecución queda `con_errores` con el nombre de la tarea y el mensaje.
+- La base **conserva la carga anterior**, porque la carga es transaccional y solo ocurre después de validar.
+- Los archivos fallidos no se registran como procesados, así que la siguiente corrida los vuelve a intentar.
+
+**Cómo usarlo:**
+
+```bash
+docker compose up -d            # PostgreSQL + Airflow
+# Abrir http://localhost:8080, activar los dos DAG y lanzar actho_ingesta_datos
+```
+
+Sin Airflow, el mismo control funciona por consola:
+
+```bash
+python src/ingesta_control.py cambios      # ¿hay archivos nuevos?
+python src/ingesta_control.py recalcular   # semáforo e historial con fecha de hoy
+python src/ingesta_control.py estado       # últimas ejecuciones
+```
+
+**Pruebas realizadas** (Airflow 3.4 y PostgreSQL 16, datos del reto):
+
+| Escenario | Resultado |
+| --- | --- |
+| Primera carga | 9 tareas exitosas en ~11 s; 6 lotes registrados |
+| Segunda corrida sin cambios | Termina en `detectar_cambios`, ejecución `sin_cambios` |
+| Recálculo con corte 21/11 y 05/12 | Historial de dos fechas; 187 empresas pasan a rojo por la cercanía del 31/12 |
+| Archivo del CRM dañado | El DAG falla en `limpiar_datos`, ejecución `con_errores` y la base conserva sus 1.848 empresas |
+
+### 7.10 Camino hacia la arquitectura objetivo
 
 | Hoy (esquema `actho`) | Arquitectura objetivo (sección 6) |
 | --- | --- |
@@ -959,7 +1044,9 @@ python3 setup.py              # Windows: py setup.py
 | `fact_encuesta_evento`, `fact_encuesta_temas` | `satisfaccion.respuesta`, `respuesta_item`, `tema_interes` |
 | `v_empresa_360` y demás vistas | `retencion.perfil_empresa`, `evaluacion_riesgo`, `segmento_miembro` |
 | `config_parametro` | `retencion.parametro_regla` |
-| Archivos en `Datos/` | `ingesta.lote_carga` + `registro_crudo` + MinIO |
+| Archivos en `Datos/` + huellas en `ingesta.lote_carga` | `ingesta.lote_carga` + `registro_crudo` + MinIO |
+| `historial.evaluacion_riesgo`, `historial.snapshot_membresia` | `retencion.evaluacion_riesgo`, `afiliacion.snapshot_membresia` |
+| DAG `actho_ingesta_datos` (un flujo para las 3 fuentes) | DAG por fuente: `ingesta_asistencia`, `ingesta_crm_mensual`, `ingesta_encuestas` |
 | Códigos anonimizados como llave | UUID + llaves naturales `UNIQUE` |
 | Llaves foráneas dentro del mismo esquema | Referencias por identificador entre esquemas |
 
@@ -1193,6 +1280,7 @@ docker compose exec ingesta python -m ingesta.cli cargar --fuente encuesta_post_
 | 1.2 | Base de datos PostgreSQL `actho`: modelo en estrella, llaves y carga (`src/cargar_postgres.py`) | ✅ |
 | 1.3 | Vistas del tablero: KPI, Empresa 360, semáforo, cartera por ejecutiva y segmentos (`sql/vistas_dashboard.sql`) | ✅ |
 | 1.4 | `setup.py`: entorno reproducible en cualquier equipo | ✅ |
+| 1.5 | Airflow: DAG de ingesta con detección de cambios y DAG de recálculo diario con historial (sección 7.9) | ✅ |
 | 2 | `docker-compose.yml` con PostgreSQL, RabbitMQ y MinIO; scripts de esquemas y roles | 🟡 PostgreSQL listo |
 | 3 | `libs/shared_kernel`: objetos de valor, evento base, Unit of Work y outbox | ⬜ |
 | 4 | `identidad-svc`: normalización de NIT y correo, cadena de resolución, excepciones | ⬜ |
@@ -1200,7 +1288,7 @@ docker compose exec ingesta python -m ingesta.cli cargar --fuente encuesta_post_
 | 6 | `afiliacion-svc`, `participacion-svc`, `satisfaccion-svc` con sus eventos | ⬜ |
 | 7 | `retencion-svc`: perfil 360, semáforo (Strategy) y segmentos (Specification) | ⬜ |
 | 8 | Tablero Streamlit: vista **Mi cartera** (MVP de la demo) | ⬜ |
-| 9 | DAGs de Airflow y recálculo diario | ⬜ |
+| 9 | DAGs de Airflow y recálculo diario | 🟡 Versión MVP lista (7.9); falta separar un DAG por fuente y notificar alertas |
 | 10 | Vistas Dirección, Eventos, Segmentos y Calidad; observabilidad | ⬜ |
 
 ### Decisiones de arquitectura (resumen)

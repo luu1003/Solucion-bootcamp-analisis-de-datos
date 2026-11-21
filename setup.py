@@ -10,7 +10,9 @@ Deja el proyecto listo para correr en cualquier equipo (macOS, Windows o Linux):
   4. Configura VS Code para usar ese entorno.
   5. Verifica que estén los archivos de la carpeta Datos/.
   6. Ejecuta los pasos del proyecto (ver PASOS), salvo que pidas solo instalar:
-     limpieza de datos y, si hay conexión configurada en .env, carga a PostgreSQL.
+     limpieza de datos y, si hay conexión configurada en .env, carga a PostgreSQL
+     y cálculo del semáforo con su historial.
+  Para la orquestación automática (Airflow) ver README, sección 7.9:  docker compose up -d
 
 Uso (desde la carpeta del proyecto):
     macOS / Linux:  python3 setup.py
@@ -73,6 +75,13 @@ PASOS = [
         "script": "src/cargar_postgres.py",
         "usa_fecha_corte": True,
         "opcional_postgres": True,  # solo corre si hay conexión en .env o DATABASE_URL
+    },
+    {
+        "nombre": "Semáforo e historial (ingesta e historial)",
+        "script": "src/ingesta_control.py",
+        "args": ["recalcular"],
+        "usa_fecha_corte": True,
+        "opcional_postgres": True,
     },
 ]
 
@@ -224,7 +233,7 @@ def correr_pasos(fecha_corte, hay_datos, sin_postgres=False):
                       "(y si usas Docker: docker compose up -d).")
                 continue
         info(titulo)
-        cmd = [PY_VENV, paso["script"]]
+        cmd = [PY_VENV, paso["script"], *paso.get("args", [])]
         if paso.get("usa_fecha_corte") and fecha_corte:
             cmd += ["--fecha-corte", fecha_corte]
         if ejecutar(cmd, env=entorno).returncode != 0:

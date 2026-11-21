@@ -1,7 +1,15 @@
-# PostgreSQL local para el proyecto (opcional). Requiere Docker Desktop.
-#   Encender:  docker compose up -d
-#   Apagar:    docker compose down
-# Coincide con la conexión de .env.ejemplo.
+# Servicios locales del proyecto ACTHO. Requiere Docker Desktop.
+#
+#   Solo la base de datos:        docker compose up -d postgres
+#   Base de datos + Airflow:      docker compose up -d
+#   Apagar:                       docker compose down
+#
+# Airflow:     http://localhost:8080  (modo local, sin usuario ni contraseña)
+# PostgreSQL:  localhost:5432 · usuario postgres · clave postgres · base actho
+#              (coincide con .env.ejemplo)
+#
+# El primer arranque de Airflow tarda unos minutos porque instala las librerías del proyecto.
+
 services:
   postgres:
     image: postgres:16
@@ -14,5 +22,38 @@ services:
       - "5432:5432"
     volumes:
       - actho_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d actho"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  airflow:
+    image: apache/airflow:3.4.0-python3.12
+    container_name: actho-airflow
+    command: standalone
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Proyecto montado dentro del contenedor
+      ACTHO_RAIZ: /opt/actho
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/actho
+      _PIP_ADDITIONAL_REQUIREMENTS: "pandas>=2.0 numpy>=1.24 openpyxl>=3.1 psycopg[binary]>=3.1"
+      # Airflow
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/actho/pipelines/airflow/dags
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DEFAULT_TIMEZONE: America/Bogota
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"   # solo para uso local
+      AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: "30"
+      TZ: America/Bogota
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/opt/actho
+      - actho_airflow:/opt/airflow
+
 volumes:
   actho_pgdata:
+  actho_airflow:
