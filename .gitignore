@@ -1,0 +1,13 @@
+# Datos del reto (confidenciales: NDA, uso exclusivo para el reto). No subir a GitHub.
+Datos/
+salida/
+
+# Sistema y temporales de Office
+.DS_Store
+~$*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
