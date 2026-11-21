@@ -1,14 +1,36 @@
-# Tema del tablero con la línea gráfica de ACTHO (morado, naranja, menta, Poppins).
+# Tema del tablero con la línea gráfica de ACTHO (morado, naranja, menta y Poppins).
 [theme]
 base = "light"
 primaryColor = "#FF5A0F"
 backgroundColor = "#EEF6F5"
 secondaryBackgroundColor = "#FFFFFF"
-textColor = "#1E1038"
-font = "sans-serif"
+textColor = "#1B1235"
+font = "Poppins"
+
+# Poppins (licencia SIL OFL) servida desde frontend/tablero/static/
+[[theme.fontFaces]]
+family = "Poppins"
+url = "app/static/Poppins-Regular.ttf"
+weight = 400
+
+[[theme.fontFaces]]
+family = "Poppins"
+url = "app/static/Poppins-Medium.ttf"
+weight = 500
+
+[[theme.fontFaces]]
+family = "Poppins"
+url = "app/static/Poppins-SemiBold.ttf"
+weight = 600
+
+[[theme.fontFaces]]
+family = "Poppins"
+url = "app/static/Poppins-Bold.ttf"
+weight = 700
 
 [server]
 headless = true
+enableStaticServing = true
 
 [browser]
 gatherUsageStats = false

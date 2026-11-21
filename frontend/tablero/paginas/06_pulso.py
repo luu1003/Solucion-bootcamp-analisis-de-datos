@@ -13,29 +13,33 @@ p = c.parametros()
 todas = c.filtrar_empresas(c.empresas())
 vig = todas[todas["es_vigente"] == 1].copy()
 
+c.heroe("Sentimos el pulso. Lo convertimos en acción.", "¿A quién podemos perder y qué hacemos hoy?",
+        "Alertas del semáforo, factores que se asocian con la renovación y un simulador para acordar los criterios con Dirección.")
+
 tab1, tab2, tab3 = st.tabs(["Alertas", "Factores de retención", "Simulador de criterios"])
 
 with tab1:
     hist = c.tabla("evaluacion_riesgo", "historial") if c.existe("historial.evaluacion_riesgo") else pd.DataFrame()
     fechas = sorted(hist["fecha_corte"].unique()) if len(hist) else []
     izq, der = st.columns([2.2, 1], gap="medium")
-    with izq:
+    with izq, c.tarjeta():
         if len(fechas) >= 2:
             ult, ant = fechas[-1], fechas[-2]
             h_ult = hist[hist["fecha_corte"] == ult].set_index("empresa_id")
             h_ant = hist[hist["fecha_corte"] == ant].set_index("empresa_id")["semaforo"]
             nuevos = h_ult[(h_ult["semaforo"] == "Rojo") & (h_ult.index.map(h_ant) != "Rojo")].reset_index()
-            st.markdown(f"**{c.fmt(len(nuevos))} empresas pasaron a rojo** entre el {c.fecha_txt(ant)} y el {c.fecha_txt(ult)}")
+            c.cabeza(f"{c.fmt(len(nuevos))} empresas pasaron a rojo", f"Entre el {c.fecha_txt(ant)} y el {c.fecha_txt(ult)}")
             evo = hist.groupby(["fecha_corte", "semaforo"]).size().reset_index(name="empresas").sort_values("fecha_corte")
             evo["Fecha de corte"] = evo["fecha_corte"].map(c.fecha_txt)
             fig = px.line(evo, x="Fecha de corte", y="empresas", color="semaforo", markers=True,
                           color_discrete_map=c.SEMAFORO, title="Evolución del semáforo")
+            fig.update_traces(line_width=3, marker_size=9)
             fig.update_xaxes(title="")
             fig.update_yaxes(title="")
-            c.grafico(fig, 260)
+            c.grafico(fig, 240, "Empresas vigentes por color en cada recálculo diario")
             tabla_alertas = nuevos[["empresa_id", "ejecutiva", "nivel_2027", "dias_a_vencer", "puntaje", "motivos"]]
         else:
-            st.markdown("**Alertas rojas actuales**")
+            c.cabeza("Alertas rojas actuales", "Empresas vigentes en rojo hoy")
             st.caption("El historial necesita al menos dos recálculos (DAG diario de Airflow) para mostrar cambios. "
                        "Mientras tanto se listan las empresas en rojo hoy.")
             tabla_alertas = vig[vig["semaforo"] == "Rojo"].sort_values("puntaje_riesgo", ascending=False)[
@@ -47,7 +51,7 @@ with tab1:
             "puntaje": st.column_config.ProgressColumn("Riesgo", min_value=0, max_value=9, format="%d"),
             "motivos": st.column_config.TextColumn("Motivos", width="large")})
         c.descargar(tabla_alertas, "alertas_rojas.csv", "Exportar alertas")
-    with der:
+    with der, c.panel():
         comp = pd.Series({"Vencimiento": (vig["pts_vencimiento"] > 0).sum(),
                           "Participación": (vig["pts_participacion"] > 0).sum(),
                           "Satisfacción": (vig["pts_satisfaccion"] > 0).sum()})
@@ -60,7 +64,7 @@ with tab2:
     st.caption("Asociaciones observadas en los datos, no causas: una empresa que ya decidió irse tampoco asiste.")
     crm = todas[(todas["en_crm"] == 1) & (todas["estado_membresia"] != "Sin estado")].copy()
     g1, g2, g3 = st.columns(3)
-    def barra(col, df, x, titulo):
+    def barra(col, df, x, titulo, sub=None):
         t = df.groupby(x, observed=False).agg(empresas=("empresa_id", "count"), vigentes=("es_vigente", "sum")).reset_index()
         t["% vigente"] = (100 * t["vigentes"] / t["empresas"]).round(1)
         fig = px.bar(t, x=x, y="% vigente", text="% vigente", hover_data=["empresas"], title=titulo,
@@ -68,31 +72,31 @@ with tab2:
         fig.update_yaxes(range=[0, 105], title="")
         fig.update_xaxes(title="")
         with col:
-            with st.container(border=True):
-                c.grafico(fig, 280)
+            with c.tarjeta():
+                c.grafico(fig, 260, sub)
     crm["Asistencias 12 meses"] = pd.cut(crm["inscripciones_12m"], [-1, 0, 2, 5, 1000], labels=["0", "1-2", "3-5", "6+"])
     crm["Personas distintas"] = pd.cut(crm["personas_distintas"], [-1, 0, 1, 3, 1000], labels=["0", "1", "2-3", "4+"])
     crm["Líneas usadas"] = pd.cut(crm["lineas_distintas"], [-1, 0, 1, 2, 10], labels=["0", "1", "2", "3+"])
-    barra(g1, crm, "Asistencias 12 meses", "% vigente por asistencias")
-    barra(g2, crm, "Personas distintas", "% vigente por personas que participan")
-    barra(g3, crm, "Líneas usadas", "% vigente por líneas usadas")
+    barra(g1, crm, "Asistencias 12 meses", "Participación", "% vigente según asistencias en 12 meses")
+    barra(g2, crm, "Personas distintas", "Amplitud de la relación", "% vigente según personas que participan")
+    barra(g3, crm, "Líneas usadas", "Uso de la oferta", "% vigente según líneas 2027 usadas")
 
 with tab3:
     st.markdown("Ajusta los criterios y mira cómo cambiaría el semáforo **antes** de cambiarlo en la base "
                 "(`actho.config_parametro`). Es la propuesta de umbrales para validar con Dirección.")
     s1, s2, s3 = st.columns(3)
-    with s1:
-        st.markdown("**Vencimiento**")
+    with s1, c.tarjeta():
+        c.cabeza("Vencimiento", "Puntos según días para vencer")
         pv30 = st.slider("Vence en 0-30 días o vencida", 0, 5, int(p["pts_vence_30"]))
         pv60 = st.slider("Vence en 31-60 días", 0, 5, int(p["pts_vence_60"]))
         pv90 = st.slider("Vence en 61-90 días", 0, 5, int(p["pts_vence_90"]))
-    with s2:
-        st.markdown("**Participación**")
+    with s2, c.tarjeta():
+        c.cabeza("Participación", "Puntos por no asistir")
         ventana = st.slider("Ventana de participación (días)", 30, 180, int(p["ventana_participacion_dias"]), step=15)
         pp = st.slider("Sin asistencias en la ventana", 0, 5, int(p["pts_sin_participacion"]))
         pp12 = st.slider("… y tampoco en 12 meses (adicional)", 0, 3, int(p["pts_sin_participacion_12m"]))
-    with s3:
-        st.markdown("**Satisfacción y umbrales**")
+    with s3, c.tarjeta():
+        c.cabeza("Satisfacción y umbrales", "Cuándo es rojo o amarillo")
         ps = st.slider("Satisfacción baja", 0, 5, int(p["pts_satisfaccion_baja"]))
         umbral_sat = st.slider("Se considera baja por debajo de", 3.0, 5.0, float(p["umbral_satisfaccion_baja"]), step=0.1)
         rojo = st.slider("Rojo desde (puntos)", 1, 12, int(p["umbral_rojo"]))
@@ -117,14 +121,14 @@ with tab3:
     larga = comp.melt("Semáforo", var_name="Escenario", value_name="Empresas")
     g1, g2 = st.columns([1.4, 1])
     with g1:
-        with st.container(border=True):
+        with c.tarjeta():
             fig = px.bar(larga, x="Semáforo", y="Empresas", color="Escenario", barmode="group", text="Empresas",
-                         color_discrete_map={"Actual": c.C["lavanda_2"], "Simulado": c.C["naranja"]},
+                         color_discrete_map={"Actual": c.C["lavanda_2"], "Simulado": c.C["morado"]},
                          title="Semáforo actual frente al simulado")
             fig.update_xaxes(title="")
             fig.update_yaxes(title="")
-            c.grafico(fig, 300)
-    with g2:
+            c.grafico(fig, 280, "Empresas vigentes por color")
+    with g2, c.panel():
         cambian = (nuevo != vig["semaforo"].to_numpy()).sum()
         c.pulso([f"<b>{c.fmt(cambian)} empresas cambiarían de color</b>",
                  f"<b>{c.fmt((nuevo == 'Rojo').sum())} en rojo</b><br><span>"

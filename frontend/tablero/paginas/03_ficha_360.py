@@ -31,15 +31,15 @@ salud = round(100 - 100 * (emp["puntaje_riesgo"] or 0) / 9) if vigente else None
 
 # Encabezado de la empresa
 st.markdown(
-    f'<div class="tarjeta"><span style="font-size:1.35rem;font-weight:700">{emp_id}</span> &nbsp; '
+    f'<div class="kpi" style="padding:1.1rem 1.3rem"><div><span style="font-size:1.5rem;font-weight:700;color:{c.C["morado"]}">{emp_id}</span> &nbsp; '
     f'{c.chip_semaforo(emp["semaforo"])} {c.chip(emp["estado_membresia"], "morado")} {c.chip(emp["nivel_2027"])}'
     f'<div class="subtitulo" style="margin-top:.4rem">{emp["tipo_membresia"]} · {emp["sector"]} · {emp["ciudad"]} · '
-    f'Ejecutiva: <b>{emp["ejecutiva"]}</b> · Afiliada desde {c.fecha_txt(emp["fecha_afiliacion"])}</div></div>',
+    f'Ejecutiva: <b>{emp["ejecutiva"]}</b> · Afiliada desde {c.fecha_txt(emp["fecha_afiliacion"])}</div></div></div>',
     unsafe_allow_html=True)
-st.write("")
 
-k = st.columns(5)
-c.kpi(k[0], "Índice de salud", c.fmt(salud) if salud is not None else "—", "100 = sin alertas", oscuro=True)
+k = c.fila(5)
+c.kpi(k[0], "Índice de salud", c.fmt(salud) if salud is not None else "—", "100 = sin alertas de riesgo", oscuro=True,
+      chip_=("Morado", emp["semaforo"]))
 if pd.notna(emp["dias_a_vencer"]):
     nota_vence = (f"vencida hace {c.fmt(-emp['dias_a_vencer'])} días" if emp["dias_a_vencer"] < 0
                   else f"en {c.fmt(emp['dias_a_vencer'])} días")
@@ -51,13 +51,12 @@ c.kpi(k[2], "Asistencias 12 meses", c.fmt(emp["inscripciones_12m"]),
 c.kpi(k[3], "Personas que participan", c.fmt(emp["personas_distintas"]), f"{c.fmt(emp['lineas_distintas'])} líneas usadas")
 prom_general = enc["satisfaccion_general"].fillna(enc["satisfaccion_prom"]).mean()
 c.kpi(k[4], "Satisfacción", c.fmt(emp["satisfaccion_promedio"], 2), f"Promedio general {c.fmt(prom_general, 2)}")
-st.write("")
 
 izq, der = st.columns([2.2, 1], gap="medium")
 with izq:
     g1, g2 = st.columns([1, 1.25])
     with g1:
-        with st.container(border=True):
+        with c.tarjeta():
             comp = pd.DataFrame({"Componente": ["Vencimiento", "Participación", "Satisfacción"],
                                  "Puntos": [emp["pts_vencimiento"], emp["pts_participacion"], emp["pts_satisfaccion"]],
                                  "Máximo": [p["pts_vencida"], p["pts_sin_participacion"] + p["pts_sin_participacion_12m"],
@@ -67,24 +66,23 @@ with izq:
                         name="Máximo", hoverinfo="skip")
             fig.add_bar(y=comp["Componente"], x=comp["Puntos"], orientation="h", marker_color=c.C["naranja"],
                         name="Puntos", text=comp["Puntos"], textposition="inside")
-            fig.update_layout(barmode="overlay", title=f"Riesgo: {c.fmt(emp['puntaje_riesgo'])} puntos",
-                              showlegend=False)
-            c.grafico(fig, 230)
+            fig.update_layout(barmode="overlay", title="Componentes del riesgo", showlegend=False)
+            c.grafico(fig, 200, f"{c.fmt(emp['puntaje_riesgo'])} puntos de 9 · rojo desde {p['umbral_rojo']}")
     with g2:
-        with st.container(border=True):
+        with c.tarjeta():
             if len(asis_e):
                 linea = asis_e.groupby(["anio_mes", "linea_2027"]).size().reset_index(name="inscripciones").sort_values("anio_mes")
                 linea["Mes"] = linea["anio_mes"].map(c.anio_mes_txt)
-                fig = px.bar(linea, x="Mes", y="inscripciones", color="linea_2027", title="Participación por mes y línea")
+                fig = px.bar(linea, x="Mes", y="inscripciones", color="linea_2027", title="Participación en experiencias")
                 fig.update_xaxes(title="")
                 fig.update_yaxes(title="", dtick=1)
-                c.grafico(fig, 230)
+                c.grafico(fig, 200, "Inscripciones por mes y línea 2027")
             else:
-                st.markdown("**Participación por mes y línea**")
+                c.cabeza("Participación en experiencias", "Inscripciones por mes y línea 2027")
                 st.info("Esta empresa no registra asistencias a eventos de 2026.")
 
-    with st.container(border=True):
-        st.markdown("**Historial de participación**")
+    with c.tarjeta():
+        c.cabeza("Historial de participación")
         if len(asis_e):
             hist = asis_e.groupby(["fecha_evento", "evento", "linea_2027", "modalidad"]) \
                          .agg(personas=("persona_id", "nunique")).reset_index().sort_values("fecha_evento", ascending=False)
@@ -96,8 +94,8 @@ with izq:
 
     p1, p2 = st.columns(2)
     with p1:
-        with st.container(border=True):
-            st.markdown("**Personas de la empresa**")
+        with c.tarjeta():
+            c.cabeza("Personas de la empresa")
             if len(personas):
                 pc = personas.groupby("nivel_cargo").size().reset_index(name="personas").sort_values("personas")
                 fig = px.bar(pc, x="personas", y="nivel_cargo", orientation="h", color_discrete_sequence=[c.C["morado"]])
@@ -109,8 +107,8 @@ with izq:
             else:
                 st.caption("Sin personas registradas.")
     with p2:
-        with st.container(border=True):
-            st.markdown("**Encuestas de la empresa**")
+        with c.tarjeta():
+            c.cabeza("Encuestas de la empresa")
             if len(enc_e):
                 c.tabla_df(enc_e[["fecha_respuesta", "evento", "satisfaccion_prom", "nps_puntaje", "tipo_cruce"]],
                            height=230, column_config={
@@ -120,7 +118,7 @@ with izq:
             else:
                 st.caption("Esta empresa no ha respondido encuestas.")
 
-with der:
+with der, c.panel():
     acciones = []
     if vigente and emp["pts_vencimiento"] > 0:
         acciones.append(f"<b>Contactar para la renovación</b><br><span>{emp['motivos_riesgo'].split(' · ')[0]}. "

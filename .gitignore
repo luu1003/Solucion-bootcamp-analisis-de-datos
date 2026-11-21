@@ -58,3 +58,9 @@ __pycache__/
 venv/
 .ipynb_checkpoints/
 .pytest_cache/
+
+# Base PostgreSQL local creada por setup.py
+.pgdata/
+
+# Credenciales del tablero
+.streamlit/secrets.toml

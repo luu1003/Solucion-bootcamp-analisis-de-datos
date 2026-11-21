@@ -17,39 +17,42 @@ r_sat = r["satisfaccion_general"].fillna(r["satisfaccion_prom"])
 nps_n = r["nps_puntaje"].notna().sum()
 prom, det = (r["nps_categoria"] == "Promotor").sum(), (r["nps_categoria"] == "Detractor").sum()
 
-k = st.columns(5)
-c.kpi(k[0], "Eventos con asistencia", c.fmt(a["evento_id"].nunique()), f"{c.fmt(len(a))} inscripciones", oscuro=True)
-c.kpi(k[1], "Personas distintas", c.fmt(a["persona_id"].nunique()), f"{c.fmt(a['empresa_id'].nunique())} empresas")
-c.kpi(k[2], "Inscripciones de no afiliados", c.fmt(100 * (a["condicion_empresa"] == "No afiliada").mean() if len(a) else None, 1, " %"),
-      "Potencial de afiliación")
-c.kpi(k[3], "Satisfacción", c.fmt(r_sat.mean(), 2), f"{c.fmt(len(r))} respuestas · escala 1-5")
-c.kpi(k[4], "NPS de eventos", c.fmt(100 * (prom - det) / nps_n if nps_n else None, 0),
-      f"{c.fmt(nps_n)} respuestas · meta +55")
-st.write("")
+k = c.fila(5)
+nps_v = 100 * (prom - det) / nps_n if nps_n else None
+c.kpi(k[0], "Experiencias 2026", c.fmt(a["evento_id"].nunique()), f"{c.fmt(len(a))} inscripciones en el periodo", oscuro=True,
+      chip_=("Morado", f"{c.fmt(a['linea_2027'].nunique())} líneas 2027"))
+c.kpi(k[1], "Personas que participan", c.fmt(a["persona_id"].nunique()), f"De {c.fmt(a['empresa_id'].nunique())} empresas",
+      chip_=("OK", f"{c.fmt(a.loc[a['condicion_empresa'] == 'Afiliada', 'empresa_id'].nunique())} afiliadas"))
+c.kpi(k[2], "Asistentes no afiliados", c.fmt(100 * (a["condicion_empresa"] == "No afiliada").mean() if len(a) else None, 1, " %"),
+      "De las inscripciones del periodo", chip_=("Alerta", "Potencial de afiliación"))
+c.kpi(k[3], "Satisfacción", c.fmt(r_sat.mean(), 2), f"Promedio 1-5 de {c.fmt(len(r))} respuestas",
+      chip_=("OK", "Alta"))
+c.kpi(k[4], "NPS de eventos", ("+" if (nps_v or 0) > 0 else "") + c.fmt(nps_v, 0), f"{c.fmt(nps_n)} respuestas con NPS",
+      chip_=("OK" if (nps_v or 0) >= 55 else "Alerta", "Meta 2027: +55"))
 
 izq, der = st.columns([2.3, 1], gap="medium")
 with izq:
     g1, g2 = st.columns(2)
     with g1:
-        with st.container(border=True):
+        with c.tarjeta():
             lin = a.groupby(["linea_2027", "condicion_empresa"]).size().reset_index(name="inscripciones")
             fig = px.bar(lin, x="inscripciones", y="linea_2027", color="condicion_empresa", orientation="h",
                          color_discrete_map={"Afiliada": c.C["morado"], "No afiliada": c.C["cian"]},
-                         title="Participación por línea 2027")
+                         title="Participación por línea")
             fig.update_yaxes(title="", categoryorder="total ascending")
             fig.update_xaxes(title="")
-            c.grafico(fig, 290)
+            c.grafico(fig, 270, "Inscripciones por línea de la oferta 2027")
     with g2:
-        with st.container(border=True):
+        with c.tarjeta():
             niv = a[a["nivel_cargo"] != "Sin dato"].groupby(["nivel_cargo", "modalidad"]).size().reset_index(name="inscripciones")
             fig = px.bar(niv, x="inscripciones", y="nivel_cargo", color="modalidad", orientation="h",
-                         title="Nivel de cargo por modalidad")
+                         title="Quién participa", color_discrete_sequence=[c.C["morado"], c.C["naranja"], c.C["lavanda_2"]])
             fig.update_yaxes(title="", categoryorder="total ascending")
             fig.update_xaxes(title="")
-            c.grafico(fig, 290)
+            c.grafico(fig, 270, "Inscripciones por nivel de cargo y modalidad")
 
-    with st.container(border=True):
-        st.markdown("**Eventos: convocatoria, satisfacción y NPS**")
+    with c.tarjeta():
+        c.cabeza("Experiencias recientes", "Convocatoria, satisfacción y NPS por evento")
         c.tabla_df(ev[["fecha", "evento", "linea_2027", "modalidad", "inscripciones", "empresas",
                        "pct_inscripciones_afiliadas", "respuestas_encuesta", "satisfaccion_promedio", "nps"]]
                    .sort_values("fecha", ascending=False), height=330, column_config={
@@ -66,37 +69,37 @@ with izq:
 
     g3, g4 = st.columns(2)
     with g3:
-        with st.container(border=True):
+        with c.tarjeta():
             asp = pd.DataFrame({
                 "Aspecto": ["Expositores", "Contenido", "Espacio o plataforma", "Convocatoria", "Recepción", "Manejo del tiempo"],
                 "Promedio": [r["calif_expositor"].mean(), r["calif_contenido"].mean(), r["calif_espacio"].mean(),
                              r["calif_convocatoria"].mean(), r["calif_recepcion"].mean(), r["calif_manejo_tiempo"].mean()],
             }).dropna()
             fig = px.bar(asp.sort_values("Promedio"), x="Promedio", y="Aspecto", orientation="h", text_auto=".2f",
-                         title="Satisfacción por aspecto (1-5)", color_discrete_sequence=[c.C["naranja"]])
+                         title="Satisfacción por aspecto", color_discrete_sequence=[c.C["morado"]])
             fig.update_xaxes(range=[1, 5.2], title="")
             fig.update_yaxes(title="")
-            c.grafico(fig, 290)
+            c.grafico(fig, 270, "Promedio 1 a 5 de cada aspecto evaluado")
     with g4:
-        with st.container(border=True):
+        with c.tarjeta():
             dist = r["nps_puntaje"].dropna().astype(int).value_counts().reindex(range(11), fill_value=0).reset_index()
             dist.columns = ["puntaje", "respuestas"]
             dist["categoria"] = pd.cut(dist["puntaje"], [-1, 6, 8, 10], labels=["Detractor", "Pasivo", "Promotor"]).astype(str)
-            fig = px.bar(dist, x="puntaje", y="respuestas", color="categoria", title="Distribución del NPS (0-10)",
-                         color_discrete_map={"Detractor": c.C["rojo"], "Pasivo": c.C["amarillo"], "Promotor": c.C["verde"]})
+            fig = px.bar(dist, x="puntaje", y="respuestas", color="categoria", title="Distribución del NPS",
+                         color_discrete_map={"Detractor": c.C["naranja"], "Pasivo": c.C["lavanda_2"], "Promotor": c.C["morado"]})
             fig.update_xaxes(dtick=1, title="")
             fig.update_yaxes(title="")
-            c.grafico(fig, 290)
+            c.grafico(fig, 270, f"{c.fmt(nps_n)} respuestas · promotores 9-10, pasivos 7-8, detractores 0-6")
 
-with der:
+with der, c.panel():
     temas = c.tabla("v_temas_solicitados")
     temas["tema"] = temas["tema"].map(lambda t: t if len(t) <= 30 else t[:29] + "…")
-    with st.container(border=True):
+    with c.tarjeta():
         fig = px.bar(temas.head(8).sort_values("menciones"), x="menciones", y="tema", orientation="h",
-                     title="Temas que piden", color_discrete_sequence=[c.C["morado"]])
+                     title="Lo que piden los afiliados", color_discrete_sequence=[c.C["morado"]])
         fig.update_yaxes(title="")
         fig.update_xaxes(title="")
-        c.grafico(fig, 330)
+        c.grafico(fig, 300, "Temas para próximos espacios")
     gusto = r["lo_que_gusto"].dropna()
     gusto = gusto[gusto.str.len() > 15]
     mejora = r["a_mejorar"].dropna()

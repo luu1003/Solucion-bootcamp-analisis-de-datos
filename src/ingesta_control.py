@@ -13,6 +13,7 @@ depender de Airflow para poder probarla y ejecutarla por separado:
   * Recálculo del semáforo y fotos históricas en el esquema 'historial'.
 
 También funciona como línea de comandos:
+    python src/ingesta_control.py ingesta       # limpia y carga solo si los archivos cambiaron (+ --forzar)
     python src/ingesta_control.py estado        # últimas ejecuciones y lotes
     python src/ingesta_control.py cambios       # ¿hay archivos nuevos?
     python src/ingesta_control.py recalcular    # semáforo y fotos con fecha de hoy
@@ -271,6 +272,37 @@ def recalcular_riesgo(conn, fecha_corte: date | str | None = None) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Ingesta completa (la usan setup.py y la línea de comandos; Airflow usa los pasos sueltos)
+# ──────────────────────────────────────────────────────────────────────────────
+def ingesta_completa(fecha_corte=None, forzar=False, origen="setup") -> dict:
+    """Limpia y carga solo si algún archivo de Datos/ cambió (o si se fuerza o falta la base).
+    Siempre recalcula el semáforo con la fecha de corte."""
+    from datetime import datetime
+    fecha = str(fecha_corte or date.today())
+    conn = conectar()
+    asegurar_esquemas(conn)
+    huellas = huellas_fuentes()
+    cambiadas = fuentes_cambiadas(huellas, ultimas_huellas(conn))
+    hay_base = conn.execute("SELECT to_regclass('actho.v_empresa_360') IS NOT NULL").fetchone()[0]
+    if not cambiadas and hay_base and not forzar:
+        r = recalcular_riesgo(conn, fecha)
+        return {"estado": "sin_cambios", "fecha_corte": fecha, "semaforo": r["semaforo"]}
+    ejec = iniciar_ejecucion(conn, f"{origen}__{datetime.now().isoformat(timespec='seconds')}", fecha, cambiadas)
+    try:
+        ejecutar_script("limpieza_datos.py", "--fecha-corte", fecha)
+        filas = validar_salida()
+        ejecutar_script("cargar_postgres.py", "--fecha-corte", fecha)
+        kpis = verificar_base(conn)
+        registrar_lotes(conn, ejec, huellas)
+        cerrar_ejecucion(conn, ejec, "procesado", {"filas": filas, "kpis": {k: str(v) for k, v in kpis.items()}})
+    except Exception as e:  # noqa: BLE001
+        cerrar_ejecucion(conn, ejec, "con_errores", {"error": str(e)[:2000]})
+        raise
+    r = recalcular_riesgo(conn, fecha)
+    return {"estado": "procesado", "fecha_corte": fecha, "fuentes_cambiadas": cambiadas, "semaforo": r["semaforo"]}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 def _cli():
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -282,9 +314,19 @@ def _cli():
         i = argumentos.index("--fecha-corte")
         fecha = argumentos[i + 1] if i + 1 < len(argumentos) else None
         argumentos = argumentos[:i] + argumentos[i + 2:]
+    forzar = "--forzar" in argumentos
+    argumentos = [a for a in argumentos if a != "--forzar"]
     orden = argumentos[0] if argumentos else "estado"
     conn = conectar()
     asegurar_esquemas(conn)
+    if orden == "ingesta":
+        r = ingesta_completa(fecha, forzar)
+        if r["estado"] == "sin_cambios":
+            print("Datos al día: ningún archivo de Datos/ cambió desde la última carga (se omite la limpieza).")
+        else:
+            print("Datos procesados y cargados. Fuentes con cambios:", ", ".join(r.get("fuentes_cambiadas") or ["(forzado)"]))
+        print(f"Semáforo al {r['fecha_corte']}: {r['semaforo']}")
+        return
     if orden == "cambios":
         cambiadas = fuentes_cambiadas(huellas_fuentes(), ultimas_huellas(conn))
         print("Fuentes con cambios:", ", ".join(cambiadas) if cambiadas else "ninguna")

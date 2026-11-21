@@ -925,18 +925,26 @@ Solo se evalúan las membresías vigentes (Activo, Pronto a expirar, Periodo de 
 
 ### 7.8 Cómo ejecutar la versión actual
 
-Requisitos: Python 3.9 o superior y, para la base de datos, PostgreSQL (o Docker).
+Requisitos: Python 3.9 o superior. Para la base de datos sirve cualquiera de estas opciones: un PostgreSQL ya configurado en `.env`, Docker, o PostgreSQL instalado en el equipo (por ejemplo `brew install postgresql@16`).
 
 ```bash
 # 1. Copiar el paquete del reto en la carpeta Datos/ (no se sube a GitHub)
-# 2. Base de datos local con Docker (opcional si ya tienes PostgreSQL)
-docker compose up -d postgres  # o "docker compose up -d" para incluir Airflow (7.9)
-cp .env.ejemplo .env          # ajustar DATABASE_URL si hace falta
-# 3. Preparar todo y ejecutar
-python3 setup.py              # Windows: py setup.py  ·  agrega --tablero para abrirlo al final
+# 2. Un solo comando:
+python3 setup.py              # Windows: py setup.py
 ```
 
-`setup.py` crea el entorno virtual `.venv`, instala `requirements.txt` y configura VS Code. Luego limpia los datos y, si hay conexión configurada, crea el esquema `actho` con sus tablas y vistas. Opciones: `--solo-instalar`, `--reinstalar`, `--sin-postgres` y `--fecha-corte AAAA-MM-DD`.
+`setup.py` deja todo funcionando y abre el tablero en Google Chrome. Si un paso ya está hecho, lo salta (aparece `SALTO` en la consola):
+
+1. Verifica Python y crea `.venv` (si ya existe y funciona, lo salta).
+2. Instala `requirements.txt` (solo si cambió desde la última instalación).
+3. Configura VS Code y verifica la carpeta `Datos/`.
+4. Busca PostgreSQL en este orden: la URL de `.env`, luego `docker compose up -d postgres` y, si no hay Docker, un clúster local en `.pgdata/` (puerto 5433, solo `localhost`). Guarda la conexión en `.env`.
+5. Limpia y carga los datos solo si alguna fuente cambió (huella SHA-256). Siempre recalcula el semáforo.
+6. Inicia Streamlit en `http://localhost:8501` (o el siguiente puerto libre), solo en `localhost`, y abre Chrome. `Ctrl+C` lo detiene.
+
+Opciones: `--solo-instalar`, `--reinstalar`, `--forzar` (reprocesa aunque no haya cambios), `--fecha-corte AAAA-MM-DD`, `--sin-tablero`, `--sin-navegador` y `--puerto N`.
+
+Usuario inicial del tablero: **admin** / **actho**. Hay que cambiarlo antes de compartir el tablero (ver 7.10).
 
 | Archivo | Función |
 | --- | --- |
@@ -949,10 +957,10 @@ python3 setup.py              # Windows: py setup.py  ·  agrega --tablero para 
 | `src/ingesta_control.py` | Huellas, detección de cambios, validación, verificación, recálculo e historial |
 | `sql/control.sql` | Esquemas persistentes `ingesta` e `historial` |
 | `pipelines/airflow/dags/` | DAG `actho_ingesta_datos` y `actho_recalculo_riesgo_diario` (ver 7.9) |
-| `frontend/tablero/` | Tablero Streamlit: `Inicio.py` (navegación), `comun.py` (datos, estilo y filtros), `paginas/` (8 pantallas) (ver 7.10) |
-| `.streamlit/config.toml` | Tema del tablero con los colores de ACTHO |
+| `frontend/tablero/` | Tablero Streamlit: `Inicio.py` (navegación), `login.py` y `auth.py` (acceso), `comun.py` (datos, estilo y filtros), `paginas/` (8 pantallas, 3 visibles) (ver 7.10) |
+| `.streamlit/config.toml` | Tema del tablero con los colores de ACTHO y la fuente Poppins |
 
-`Datos/`, `salida/`, `.env` y cualquier `.xlsx`, `.csv` o `.pdf` están en `.gitignore`: los datos del reto nunca se suben al repositorio.
+`Datos/`, `salida/`, `.env`, `.pgdata/` y cualquier `.xlsx`, `.csv` o `.pdf` están en `.gitignore`: los datos del reto nunca se suben al repositorio.
 
 ### 7.9 Orquestación con Airflow
 
@@ -1038,7 +1046,27 @@ python src/ingesta_control.py estado       # últimas ejecuciones
 
 ### 7.10 Tablero (Streamlit + Plotly)
 
-El tablero está en `frontend/tablero/` y sigue los wireframes de Figma: barra lateral morada, encabezado con píldoras de estado, cuadrícula central y panel "Pulso" a la derecha, con la línea gráfica de actho.org (morado `#5B00D9`, naranja `#FF5A0F`, cian, fondo menta y Poppins). Lee solo las vistas del esquema `actho` (sección 7.4).
+El tablero está en `frontend/tablero/` y replica el sistema de diseño de los wireframes de Figma y de actho.org. Lee solo las vistas del esquema `actho` (sección 7.4).
+
+| Elemento | Cómo se ve |
+| --- | --- |
+| Pantalla | Fondo menta `#EEF6F5`, márgenes de 16 px, tipografía Poppins (incluida en `frontend/tablero/static/`, licencia OFL) |
+| Barra lateral | Morado `#5B00D9`, logo *ac**tho***, secciones en cian, ítem activo en píldora blanca, cinta naranja decorativa, lema "Sentimos el pulso." y bloque de usuario |
+| Encabezado de página | Título, subtítulo y tres píldoras de estado en mayúsculas (corte, última carga, datos por revisar) |
+| Tarjetas | Blancas, radio 20, sin borde; título morado y subtítulo naranja |
+| KPI | Etiqueta en mayúsculas, valor grande, chip de tono (OK, Alerta, Riesgo, Morado) y nota; la primera en variante oscura morada |
+| Panel derecho (Pulso) | Morado, con tarjetas blancas de lectura o actividad y botón naranja tipo píldora |
+| Tablas | Encabezado en mayúsculas y filas con título y detalle, como los componentes `Tabla/Encabezado` y `Tabla/Fila` |
+| Gráficos | Barras redondeadas en morado, lavanda y naranja; NPS con promotores morado, pasivos lavanda y detractores naranja |
+
+Los componentes están en `comun.py` (`encabezado`, `kpi`, `meta`, `cabeza`, `tarjeta`, `panel`, `actividad`, `tabla_html`, `heroe`, `grafico`).
+
+**Inicio de sesión.** Antes del tablero aparece una pantalla de acceso con la imagen de ACTHO: un panel morado con el mensaje de bienvenida, una franja naranja y una tarjeta blanca con el formulario. Las contraseñas se guardan con PBKDF2-SHA256 (310.000 iteraciones) y sal propia, nunca en texto plano. Tras 5 intentos fallidos, el acceso se bloquea 60 segundos. "Cerrar sesión" está en la barra lateral.
+
+- Usuario inicial: `admin` / `actho` (en `auth.py`, solo para desarrollo).
+- Para crear o cambiar usuarios: `python frontend/tablero/auth.py` pide la contraseña y genera la sal y el hash. Estos se agregan en `.streamlit/secrets.toml` bajo `[usuarios]` (archivo fuera de Git), que tiene prioridad sobre los usuarios de `auth.py`.
+
+**Páginas visibles por ahora:** Dashboard, Afiliados y Experiencias. Las demás siguen en `paginas/` y se activan agregándolas a la lista `VISIBLES` de `Inicio.py`. Los botones que llevan a páginas ocultas (por ejemplo "Abrir ficha 360°") solo aparecen cuando esa página está activa.
 
 | Página | Wireframe | Para quién | Contenido |
 | --- | --- | --- | --- |
@@ -1056,14 +1084,14 @@ El tablero está en `frontend/tablero/` y sigue los wireframes de Figma: barra l
 **Cómo abrirlo:**
 
 ```bash
-python3 setup.py --tablero                    # prepara, carga y abre el tablero
+python3 setup.py                              # prepara, carga y abre el tablero en Chrome
 # o, con el entorno ya listo:
 streamlit run frontend/tablero/Inicio.py      # http://localhost:8501
 # o con Docker (sin instalar Python):
 docker compose up -d postgres tablero
 ```
 
-**Pruebas realizadas:** las 8 páginas se recorrieron con Chrome (Playwright) en **Streamlit 1.50** (Python 3.9+) y **1.67**, sin errores ni avisos. También se probó la navegación del directorio a la ficha 360° y el simulador. Con los parámetros vigentes, el simulador reproduce exactamente el semáforo calculado en PostgreSQL (0 diferencias).
+**Pruebas realizadas:** el login y las páginas visibles se auditaron en Chrome (Playwright) a 1280 y 1500 px, sin elementos sobrepuestos, sin componentes del mismo tipo con distinto tamaño y sin texto desbordado. Antes, las 8 páginas se recorrieron con Chrome (Playwright) en **Streamlit 1.50** (Python 3.9+) y **1.67**, sin errores ni avisos. También se probó la navegación del directorio a la ficha 360° y el simulador. Con los parámetros vigentes, el simulador reproduce exactamente el semáforo calculado en PostgreSQL (0 diferencias).
 
 **Pendiente:** consultas en lenguaje natural con IA (wireframe 06). El tablero deja el espacio señalado; el asistente solo podrá leer las vistas, con datos seudonimizados.
 
