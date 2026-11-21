@@ -71,6 +71,7 @@ PASOS = [
     {
         "nombre": "Carga a PostgreSQL",
         "script": "src/cargar_postgres.py",
+        "usa_fecha_corte": True,
         "opcional_postgres": True,  # solo corre si hay conexión en .env o DATABASE_URL
     },
 ]

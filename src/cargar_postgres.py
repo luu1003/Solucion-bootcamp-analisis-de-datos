@@ -154,6 +154,7 @@ def main():
     ap = argparse.ArgumentParser(description="Carga los datos limpios a PostgreSQL")
     ap.add_argument("--esquema", default=os.environ.get("PGSCHEMA", "actho"))
     ap.add_argument("--solo-sql", action="store_true", help="solo escribe sql/esquema.sql, sin conectarse")
+    ap.add_argument("--fecha-corte", default=None, help="AAAA-MM-DD para los indicadores (por defecto, hoy)")
     args = ap.parse_args()
     esquema = args.esquema
 
@@ -195,6 +196,15 @@ def main():
                 print(f"  {nombre:<22} {n:>6} filas  {marca}")
                 if n != len(df):
                     raise SystemExit("La cantidad de filas no coincide; se revierte la carga.")
+            # Vistas del tablero (indicadores, semáforo, segmentos).
+            vistas = RAIZ / "sql" / "vistas_dashboard.sql"
+            if vistas.exists():
+                cur.execute(vistas.read_text(encoding="utf-8").replace("actho.", f"{esquema}."))
+                if args.fecha_corte:
+                    cur.execute(f"UPDATE {esquema}.config_parametro SET fecha = %s WHERE clave = 'fecha_corte'",
+                                (args.fecha_corte,))
+                cur.execute("SELECT count(*) FROM information_schema.views WHERE table_schema = %s", (esquema,))
+                print(f"  vistas del tablero      {cur.fetchone()[0]:>6} creadas (sql/vistas_dashboard.sql)")
     print("\nCarga terminada.")
 
 
