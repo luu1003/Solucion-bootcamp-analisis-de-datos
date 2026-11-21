@@ -925,7 +925,7 @@ Solo se evalúan las membresías vigentes (Activo, Pronto a expirar, Periodo de 
 
 ### 7.8 Cómo ejecutar la versión actual
 
-Requisitos: Python 3.9 o superior. Para la base de datos sirve cualquiera de estas opciones: un PostgreSQL ya configurado en `.env`, Docker, o PostgreSQL instalado en el equipo (por ejemplo `brew install postgresql@16`).
+Requisito: Python 3.9 o superior. No hace falta instalar PostgreSQL ni Docker: si no hay ninguno, `setup.py` pregunta y lo instala.
 
 ```bash
 # 1. Copiar el paquete del reto en la carpeta Datos/ (no se sube a GitHub)
@@ -938,11 +938,11 @@ python3 setup.py              # Windows: py setup.py
 1. Verifica Python y crea `.venv` (si ya existe y funciona, lo salta).
 2. Instala `requirements.txt` (solo si cambió desde la última instalación).
 3. Configura VS Code y verifica la carpeta `Datos/`.
-4. Busca PostgreSQL en este orden: la URL de `.env`, luego `docker compose up -d postgres` y, si no hay Docker, un clúster local en `.pgdata/` (puerto 5433, solo `localhost`). Guarda la conexión en `.env`.
+4. Busca PostgreSQL en este orden: la URL de `.env`, luego `docker compose up -d postgres` y luego un PostgreSQL instalado en el equipo, con el que crea una base propia en `.pgdata/` (puerto 5433, solo `localhost`). Si no encuentra ninguno, pregunta `[Y/n]` e instala PostgreSQL 16 portátil en `.postgres/` (descarga única de unos 30 MB del paquete `pgserver` de PyPI, sin permisos de administrador). Guarda la conexión en `.env`.
 5. Limpia y carga los datos solo si alguna fuente cambió (huella SHA-256). Siempre recalcula el semáforo.
 6. Inicia Streamlit en `http://localhost:8501` (o el siguiente puerto libre), solo en `localhost`, y abre Chrome. `Ctrl+C` lo detiene.
 
-Opciones: `--solo-instalar`, `--reinstalar`, `--forzar` (reprocesa aunque no haya cambios), `--fecha-corte AAAA-MM-DD`, `--sin-tablero`, `--sin-navegador` y `--puerto N`.
+Opciones: `--solo-instalar`, `--reinstalar`, `--forzar` (reprocesa aunque no haya cambios), `--fecha-corte AAAA-MM-DD`, `--sin-tablero`, `--sin-navegador`, `--puerto N` y `-y` (responde sí a las preguntas).
 
 Usuario inicial del tablero: **admin** / **actho**. Hay que cambiarlo antes de compartir el tablero (ver 7.10).
 
@@ -960,7 +960,7 @@ Usuario inicial del tablero: **admin** / **actho**. Hay que cambiarlo antes de c
 | `frontend/tablero/` | Tablero Streamlit: `Inicio.py` (navegación), `login.py` y `auth.py` (acceso), `comun.py` (datos, estilo y filtros), `paginas/` (8 pantallas, 3 visibles) (ver 7.10) |
 | `.streamlit/config.toml` | Tema del tablero con los colores de ACTHO y la fuente Poppins |
 
-`Datos/`, `salida/`, `.env`, `.pgdata/` y cualquier `.xlsx`, `.csv` o `.pdf` están en `.gitignore`: los datos del reto nunca se suben al repositorio.
+`Datos/`, `salida/`, `.env`, `.pgdata/`, `.postgres/` y cualquier `.xlsx`, `.csv` o `.pdf` están en `.gitignore`: los datos del reto nunca se suben al repositorio.
 
 ### 7.9 Orquestación con Airflow
 

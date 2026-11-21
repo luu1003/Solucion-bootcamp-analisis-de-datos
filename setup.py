@@ -14,7 +14,9 @@ Qué hace (y se salta lo que ya esté listo):
        a) la base de .env / DATABASE_URL, si responde;
        b) Docker Desktop (docker compose up -d postgres), si está abierto;
        c) PostgreSQL instalado en el equipo (Homebrew, Postgres.app…): crea una base propia
-          del proyecto en .pgdata/ (puerto 5433), sin permisos de administrador.
+          del proyecto en .pgdata/ (puerto 5433), sin permisos de administrador;
+       d) si no hay ninguno, pregunta [Y/n] e instala PostgreSQL 16 portátil en .postgres/
+          (descarga única de ≈30 MB, sin administrador) y sigue como en c).
   5. Procesa los datos de Datos/ solo si algún archivo cambió desde la última carga
      (limpieza, validación, carga, verificación) y recalcula el semáforo de hoy.
   6. Arranca el tablero en http://localhost:8501 y lo abre en Google Chrome.
@@ -28,6 +30,7 @@ Opciones:
     --sin-tablero              procesa los datos pero no abre el tablero
     --sin-navegador            arranca el tablero sin abrir el navegador
     --puerto N                 puerto del tablero (por defecto 8501 o el siguiente libre)
+    -y, --si                   responde sí a las preguntas (instala PostgreSQL sin preguntar)
 
 Solo usa la librería estándar de Python, así que corre antes de instalar nada.
 """
@@ -59,6 +62,14 @@ PY_VENV = VENV / ("Scripts/python.exe" if ES_WINDOWS else "bin/python")
 HASH_REQ = VENV / ".requirements.sha256"
 ENV = RAIZ / ".env"
 PGDATA = RAIZ / ".pgdata"
+PGBIN_PROYECTO = RAIZ / ".postgres"          # PostgreSQL portátil que instala setup.py si hace falta
+PGSERVER_VERSION = "0.1.4"                    # paquete de PyPI que trae los binarios de PostgreSQL 16
+PGSERVER_PLATAFORMAS = {
+    ("Darwin", "arm64"): "macosx_11_0_arm64",
+    ("Darwin", "x86_64"): "macosx_10_9_x86_64",
+    ("Linux", "x86_64"): "manylinux_2_17_x86_64",
+    ("Windows", "AMD64"): "win_amd64",
+}
 PG_PUERTO_LOCAL = 5433
 URL_DOCKER = "postgresql://postgres:postgres@localhost:5432/actho"
 URL_LOCAL = f"postgresql://postgres@localhost:{PG_PUERTO_LOCAL}/actho"
@@ -92,6 +103,26 @@ def fallar(texto, ayuda=""):
     if ayuda:
         print("         " + ayuda.replace("\n", "\n         "))
     sys.exit(1)
+
+
+def preguntar(texto, si_por_defecto=True, auto=False):
+    """Pregunta Y/n en la consola. Sin consola interactiva (o con --si) usa la respuesta por defecto."""
+    opciones = "[Y/n]" if si_por_defecto else "[y/N]"
+    if auto or not sys.stdin or not sys.stdin.isatty():
+        info(f"{texto} {opciones} → {'sí' if si_por_defecto else 'no'} (automático)")
+        return si_por_defecto
+    while True:
+        try:
+            r = input(f"  [ ? ]   {texto} {opciones} ").strip().lower()
+        except EOFError:
+            return si_por_defecto
+        if r == "":
+            return si_por_defecto
+        if r in ("y", "yes", "s", "si", "sí"):
+            return True
+        if r in ("n", "no"):
+            return False
+        print("          Responde Y (sí) o n (no).")
 
 
 def ejecutar(cmd, **kw):
@@ -233,7 +264,7 @@ def postgres_docker():
 
 
 def carpeta_bin_postgres():
-    candidatos = []
+    candidatos = [str(PGBIN_PROYECTO / "pgserver" / "pginstall" / "bin")]
     if shutil.which("pg_ctl"):
         candidatos.append(str(Path(shutil.which("pg_ctl")).parent))
     if SISTEMA == "Darwin":
@@ -249,6 +280,53 @@ def carpeta_bin_postgres():
         if (Path(c) / f"pg_ctl{ext}").exists() and (Path(c) / f"initdb{ext}").exists():
             return Path(c)
     return None
+
+
+def instalar_postgres_portatil():
+    """Descarga PostgreSQL 16 (binarios del paquete pgserver de PyPI) en .postgres/ dentro del proyecto.
+    No pide permisos de administrador, no toca el sistema y se borra con solo eliminar la carpeta."""
+    import zipfile
+    clave = (SISTEMA, "arm64" if platform.machine().lower() in ("arm64", "aarch64") and SISTEMA == "Darwin"
+             else platform.machine())
+    plataforma = PGSERVER_PLATAFORMAS.get(clave)
+    if not plataforma:
+        aviso(f"No hay PostgreSQL portátil para {SISTEMA} {platform.machine()}.")
+        return None
+    descarga = RAIZ / ".postgres_descarga"
+    shutil.rmtree(descarga, ignore_errors=True)
+    info("Descargando PostgreSQL 16 (≈30 MB, una sola vez)…")
+    r = ejecutar([PY_VENV, "-m", "pip", "download", f"pgserver=={PGSERVER_VERSION}", "--no-deps",
+                  "--only-binary=:all:", "--python-version", "3.12", "--platform", plataforma,
+                  "-d", descarga, "-q", "--disable-pip-version-check"], capture_output=True, text=True)
+    ruedas = sorted(descarga.glob("pgserver-*.whl"))
+    if r.returncode != 0 or not ruedas:
+        aviso("No se pudo descargar PostgreSQL: " + (r.stderr or r.stdout)[-300:])
+        return None
+    info("Instalando PostgreSQL en .postgres/ …")
+    shutil.rmtree(PGBIN_PROYECTO, ignore_errors=True)
+    # Se extrae el paquete completo: las librerías compartidas viven junto a pginstall/
+    # (pgserver.libs/ en Linux, pgserver/.dylibs/ en macOS) y los binarios las buscan por ruta relativa.
+    with zipfile.ZipFile(ruedas[0]) as z:
+        for item in z.infolist():
+            if item.is_dir() or not item.filename.startswith(("pgserver/", "pgserver.libs/")):
+                continue
+            destino = PGBIN_PROYECTO / item.filename
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            with z.open(item) as origen, open(destino, "wb") as f:
+                shutil.copyfileobj(origen, f)
+            if not ES_WINDOWS:
+                modo = (item.external_attr >> 16) & 0o777
+                os.chmod(destino, modo or (0o755 if "/bin/" in item.filename or ".so" in item.filename
+                                           or item.filename.endswith(".dylib") else 0o644))
+    shutil.rmtree(descarga, ignore_errors=True)
+    bindir = PGBIN_PROYECTO / "pgserver" / "pginstall" / "bin"
+    ext = ".exe" if ES_WINDOWS else ""
+    v = ejecutar([bindir / f"postgres{ext}", "--version"], capture_output=True, text=True)
+    if v.returncode != 0:
+        aviso("PostgreSQL se descargó pero no arranca en este equipo: " + (v.stderr or v.stdout)[-300:])
+        return None
+    ok(f"Instalado {v.stdout.strip()} en .postgres/")
+    return bindir
 
 
 def postgres_local(bindir: Path):
@@ -282,7 +360,7 @@ def postgres_local(bindir: Path):
     return URL_LOCAL if responde(URL_LOCAL, espera=20) else None
 
 
-def asegurar_postgres():
+def asegurar_postgres(auto=False):
     url = url_configurada()
     if url and responde(url):
         salto("PostgreSQL ya está disponible (" + url.split("@")[-1] + ")")
@@ -301,11 +379,20 @@ def asegurar_postgres():
             guardar_url(u)
             ok(f"PostgreSQL local del proyecto corriendo (localhost:{PG_PUERTO_LOCAL}, datos en .pgdata/)")
             return u, bindir
+    aviso("No encontré PostgreSQL ni Docker en este equipo.")
+    if preguntar("¿Instalo PostgreSQL 16 ahora dentro del proyecto (sin permisos de administrador)?", auto=auto):
+        bindir = instalar_postgres_portatil()
+        if bindir:
+            u = postgres_local(bindir)
+            if u:
+                guardar_url(u)
+                ok(f"PostgreSQL local del proyecto corriendo (localhost:{PG_PUERTO_LOCAL}, datos en .pgdata/)")
+                return u, bindir
     instr = {"Darwin": "Opción 1: instala Docker Desktop y ábrelo.\n"
                        "Opción 2: brew install postgresql@16   (o instala Postgres.app)",
              "Windows": "Opción 1: instala Docker Desktop y ábrelo.\n"
                         "Opción 2: instala PostgreSQL 16 desde https://www.postgresql.org/download/windows/"}
-    fallar("No encontré PostgreSQL ni Docker en este equipo.",
+    fallar("No hay PostgreSQL disponible para el tablero.",
            instr.get(SISTEMA, "Instala Docker o PostgreSQL 16 (sudo apt install postgresql).") +
            "\nLuego vuelve a correr:  python3 setup.py")
 
@@ -421,6 +508,7 @@ def main():
     ap.add_argument("--sin-tablero", action="store_true")
     ap.add_argument("--sin-navegador", action="store_true")
     ap.add_argument("--puerto", type=int, default=8501)
+    ap.add_argument("-y", "--si", action="store_true", help="responde sí a las preguntas (instalar PostgreSQL)")
     args = ap.parse_args()
 
     print("\n=== ACTHO · Tablero integral de afiliados ===\n")
@@ -432,7 +520,7 @@ def main():
         print("\nEntorno listo.\n")
         return
     verificar_datos()
-    url_bd, _ = asegurar_postgres()
+    url_bd, _ = asegurar_postgres(auto=args.si)
     procesar_datos(url_bd, args.fecha_corte, args.forzar)
     if args.sin_tablero:
         print("\nDatos listos. Para abrir el tablero:  python3 setup.py\n")
