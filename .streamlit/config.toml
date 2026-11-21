@@ -1,0 +1,17 @@
+# Tema del tablero con la línea gráfica de ACTHO (morado, naranja, menta, Poppins).
+[theme]
+base = "light"
+primaryColor = "#FF5A0F"
+backgroundColor = "#EEF6F5"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#1E1038"
+font = "sans-serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"

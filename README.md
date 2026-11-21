@@ -933,7 +933,7 @@ Requisitos: Python 3.9 o superior y, para la base de datos, PostgreSQL (o Docker
 docker compose up -d postgres  # o "docker compose up -d" para incluir Airflow (7.9)
 cp .env.ejemplo .env          # ajustar DATABASE_URL si hace falta
 # 3. Preparar todo y ejecutar
-python3 setup.py              # Windows: py setup.py
+python3 setup.py              # Windows: py setup.py  ·  agrega --tablero para abrirlo al final
 ```
 
 `setup.py` crea el entorno virtual `.venv`, instala `requirements.txt` y configura VS Code. Luego limpia los datos y, si hay conexión configurada, crea el esquema `actho` con sus tablas y vistas. Opciones: `--solo-instalar`, `--reinstalar`, `--sin-postgres` y `--fecha-corte AAAA-MM-DD`.
@@ -949,6 +949,8 @@ python3 setup.py              # Windows: py setup.py
 | `src/ingesta_control.py` | Huellas, detección de cambios, validación, verificación, recálculo e historial |
 | `sql/control.sql` | Esquemas persistentes `ingesta` e `historial` |
 | `pipelines/airflow/dags/` | DAG `actho_ingesta_datos` y `actho_recalculo_riesgo_diario` (ver 7.9) |
+| `frontend/tablero/` | Tablero Streamlit: `Inicio.py` (navegación), `comun.py` (datos, estilo y filtros), `paginas/` (8 pantallas) (ver 7.10) |
+| `.streamlit/config.toml` | Tema del tablero con los colores de ACTHO |
 
 `Datos/`, `salida/`, `.env` y cualquier `.xlsx`, `.csv` o `.pdf` están en `.gitignore`: los datos del reto nunca se suben al repositorio.
 
@@ -1034,7 +1036,38 @@ python src/ingesta_control.py estado       # últimas ejecuciones
 | Recálculo con corte 21/11 y 05/12 | Historial de dos fechas; 187 empresas pasan a rojo por la cercanía del 31/12 |
 | Archivo del CRM dañado | El DAG falla en `limpiar_datos`, ejecución `con_errores` y la base conserva sus 1.848 empresas |
 
-### 7.10 Camino hacia la arquitectura objetivo
+### 7.10 Tablero (Streamlit + Plotly)
+
+El tablero está en `frontend/tablero/` y sigue los wireframes de Figma: barra lateral morada, encabezado con píldoras de estado, cuadrícula central y panel "Pulso" a la derecha, con la línea gráfica de actho.org (morado `#5B00D9`, naranja `#FF5A0F`, cian, fondo menta y Poppins). Lee solo las vistas del esquema `actho` (sección 7.4).
+
+| Página | Wireframe | Para quién | Contenido |
+| --- | --- | --- | --- |
+| Panel general | 01 | Dirección y Junta | Avance a las metas 2027 (renovación 90 %, NPS +55), activos, vencimientos a 90 días, participación, satisfacción, semáforo, vencimientos de 12 meses, inscripciones por mes, vigentes por nivel y lecturas de Pulso |
+| Afiliados | 02 | Comercial | Directorio filtrable y ordenado por riesgo; vista rápida y acceso a la ficha; exportación CSV |
+| Ficha 360° | 03 | Ejecutivas | Índice de salud, componentes del riesgo, vencimiento, historial de participación, personas, encuestas y acciones sugeridas |
+| Renovación y retención | 04 | Comercial y Dirección | Calendario de renovaciones a 30, 60 y 90 días, mapa de vencimientos por ejecutiva y mes, retención por antigüedad y por participación, y seguimiento por ejecutiva |
+| Experiencias y NPS | 05 | Experiencias | Participación por línea, modalidad y cargo; tabla de eventos con satisfacción y NPS; satisfacción por aspecto, distribución del NPS, temas pedidos y comentarios |
+| Pulso | 06 | Dirección | Alertas y nuevos rojos (desde `historial`), factores asociados a la retención y **simulador de criterios** del semáforo |
+| Segmentos | — | Comunicaciones | Los 7 segmentos del reto con personas contactables (Ley 1581) y exportación |
+| Datos y calidad | 07 | Datos | Cargas de Airflow, diagnóstico de calidad, completitud del CRM, diccionario y recomendaciones de captura |
+
+**Filtros globales** (barra lateral, se mantienen al cambiar de página): periodo, nivel 2027, tipo de afiliado, sector, ciudad y ejecutiva, como pide el reto.
+
+**Cómo abrirlo:**
+
+```bash
+python3 setup.py --tablero                    # prepara, carga y abre el tablero
+# o, con el entorno ya listo:
+streamlit run frontend/tablero/Inicio.py      # http://localhost:8501
+# o con Docker (sin instalar Python):
+docker compose up -d postgres tablero
+```
+
+**Pruebas realizadas:** las 8 páginas se recorrieron con Chrome (Playwright) en **Streamlit 1.50** (Python 3.9+) y **1.67**, sin errores ni avisos. También se probó la navegación del directorio a la ficha 360° y el simulador. Con los parámetros vigentes, el simulador reproduce exactamente el semáforo calculado en PostgreSQL (0 diferencias).
+
+**Pendiente:** consultas en lenguaje natural con IA (wireframe 06). El tablero deja el espacio señalado; el asistente solo podrá leer las vistas, con datos seudonimizados.
+
+### 7.11 Camino hacia la arquitectura objetivo
 
 | Hoy (esquema `actho`) | Arquitectura objetivo (sección 6) |
 | --- | --- |
@@ -1281,15 +1314,16 @@ docker compose exec ingesta python -m ingesta.cli cargar --fuente encuesta_post_
 | 1.3 | Vistas del tablero: KPI, Empresa 360, semáforo, cartera por ejecutiva y segmentos (`sql/vistas_dashboard.sql`) | ✅ |
 | 1.4 | `setup.py`: entorno reproducible en cualquier equipo | ✅ |
 | 1.5 | Airflow: DAG de ingesta con detección de cambios y DAG de recálculo diario con historial (sección 7.9) | ✅ |
+| 1.6 | Tablero Streamlit con las 8 pantallas de los wireframes, filtros globales, exportaciones y simulador (sección 7.10) | ✅ |
 | 2 | `docker-compose.yml` con PostgreSQL, RabbitMQ y MinIO; scripts de esquemas y roles | 🟡 PostgreSQL listo |
 | 3 | `libs/shared_kernel`: objetos de valor, evento base, Unit of Work y outbox | ⬜ |
 | 4 | `identidad-svc`: normalización de NIT y correo, cadena de resolución, excepciones | ⬜ |
 | 5 | `ingesta-svc`: adaptadores ACL para las 3 fuentes del reto | ⬜ |
 | 6 | `afiliacion-svc`, `participacion-svc`, `satisfaccion-svc` con sus eventos | ⬜ |
 | 7 | `retencion-svc`: perfil 360, semáforo (Strategy) y segmentos (Specification) | ⬜ |
-| 8 | Tablero Streamlit: vista **Mi cartera** (MVP de la demo) | ⬜ |
+| 8 | Tablero Streamlit: vista **Mi cartera** (MVP de la demo) | ✅ Sobre las vistas SQL (7.10) |
 | 9 | DAGs de Airflow y recálculo diario | 🟡 Versión MVP lista (7.9); falta separar un DAG por fuente y notificar alertas |
-| 10 | Vistas Dirección, Eventos, Segmentos y Calidad; observabilidad | ⬜ |
+| 10 | Vistas Dirección, Eventos, Segmentos y Calidad; observabilidad | 🟡 Vistas listas (7.10); falta observabilidad |
 
 ### Decisiones de arquitectura (resumen)
 

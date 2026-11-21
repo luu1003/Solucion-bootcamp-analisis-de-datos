@@ -23,6 +23,7 @@ Opciones:
     --reinstalar               borra y vuelve a crear .venv desde cero
     --fecha-corte AAAA-MM-DD   fecha de corte para la limpieza (por defecto, hoy)
     --sin-postgres             no cargar a PostgreSQL aunque haya conexión configurada
+    --tablero                  abrir el tablero (Streamlit) al terminar
 
 PostgreSQL (opcional):
     1. Ten un servidor PostgreSQL. Con Docker:  docker compose up -d
@@ -164,7 +165,7 @@ def instalar_librerias():
 
 def verificar_librerias():
     codigo = ("import importlib.metadata as m;"
-              "print(', '.join(f'{n} {m.version(n)}' for n in ['pandas','numpy','openpyxl','psycopg']))")
+              "print(', '.join(f'{n} {m.version(n)}' for n in ['pandas','numpy','openpyxl','psycopg','streamlit','plotly']))")
     r = ejecutar([PY_VENV, "-c", codigo], capture_output=True, text=True)
     if r.returncode != 0:
         fallar("Las librerías no quedaron instaladas correctamente.", "Corre:  python setup.py --reinstalar")
@@ -255,6 +256,7 @@ def main():
     ap.add_argument("--reinstalar", action="store_true", help="borrar y recrear .venv")
     ap.add_argument("--fecha-corte", default=None, help="AAAA-MM-DD")
     ap.add_argument("--sin-postgres", action="store_true", help="no cargar a PostgreSQL")
+    ap.add_argument("--tablero", action="store_true", help="abrir el tablero al terminar")
     args = ap.parse_args()
 
     print("\n=== Preparación del proyecto ACTHO ===\n")
@@ -271,8 +273,12 @@ def main():
         correr_pasos(args.fecha_corte, hay_datos, args.sin_postgres)
 
     activar = r".venv\Scripts\activate" if ES_WINDOWS else "source .venv/bin/activate"
-    print(f"\nListo. Para trabajar a mano:  {activar}   y luego   python src/limpieza_datos.py")
-    print("Resultados en la carpeta salida/.\n")
+    print("\nListo. Resultados en la carpeta salida/ y en PostgreSQL (esquema actho).")
+    print(f"Para abrir el tablero:  {activar}   y luego   streamlit run frontend/tablero/Inicio.py")
+    print("                       (se abre en http://localhost:8501)")
+    if args.tablero:
+        info("Abriendo el tablero… (Ctrl+C para cerrarlo)")
+        ejecutar([PY_VENV, "-m", "streamlit", "run", "frontend/tablero/Inicio.py"])
 
 
 if __name__ == "__main__":

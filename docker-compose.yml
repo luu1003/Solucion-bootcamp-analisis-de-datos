@@ -1,9 +1,11 @@
 # Servicios locales del proyecto ACTHO. Requiere Docker Desktop.
 #
 #   Solo la base de datos:        docker compose up -d postgres
-#   Base de datos + Airflow:      docker compose up -d
+#   Base de datos + tablero:      docker compose up -d postgres tablero
+#   Todo (con Airflow):           docker compose up -d
 #   Apagar:                       docker compose down
 #
+# Tablero:     http://localhost:8501
 # Airflow:     http://localhost:8080  (modo local, sin usuario ni contraseña)
 # PostgreSQL:  localhost:5432 · usuario postgres · clave postgres · base actho
 #              (coincide con .env.ejemplo)
@@ -54,6 +56,26 @@ services:
       - .:/opt/actho
       - actho_airflow:/opt/airflow
 
+  tablero:
+    image: python:3.12-slim
+    container_name: actho-tablero
+    working_dir: /opt/actho
+    command: >
+      sh -c "pip install --quiet --disable-pip-version-check -r requirements.txt &&
+             streamlit run frontend/tablero/Inicio.py --server.address 0.0.0.0 --server.port 8501"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/actho
+      TZ: America/Bogota
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/opt/actho
+      - actho_pip:/root/.cache/pip
+
 volumes:
+  actho_pip:
   actho_pgdata:
   actho_airflow:
