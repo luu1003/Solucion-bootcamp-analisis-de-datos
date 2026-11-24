@@ -96,9 +96,9 @@ with tab3:
         pv60 = st.slider("Vence en 31-60 días", 0, 5, int(p["pts_vence_60"]))
         pv90 = st.slider("Vence en 61-90 días", 0, 5, int(p["pts_vence_90"]))
     with s2, c.tarjeta():
-        c.cabeza("Participación", "Puntos por no asistir")
+        c.cabeza("Participación", "Puntos por no usar beneficios")
         ventana = st.slider("Ventana de participación (días)", 30, 180, int(p["ventana_participacion_dias"]), step=15)
-        pp = st.slider("Sin asistencias en la ventana", 0, 5, int(p["pts_sin_participacion"]))
+        pp = st.slider("Sin uso de beneficios en la ventana", 0, 5, int(p["pts_sin_participacion"]))
         pp12 = st.slider("… y tampoco en 12 meses (adicional)", 0, 3, int(p["pts_sin_participacion_12m"]))
     with s3, c.tarjeta():
         c.cabeza("Satisfacción y umbrales", "Cuándo el riesgo es alto o medio")
@@ -107,15 +107,16 @@ with tab3:
         rojo = st.slider("Riesgo alto desde (puntos)", 1, 12, int(p["umbral_rojo"]))
         amarillo = st.slider("Riesgo medio desde (puntos)", 1, 12, int(p["umbral_amarillo"]))
 
-    # Participación en la nueva ventana, desde el detalle de asistencia
+    # Participación en la nueva ventana: usos fechados de beneficios (misma regla que la base)
     corte = pd.Timestamp(p["fecha_corte"])
-    a = c.asistencia()
-    activos_v = set(a[(a["fecha_evento"] > corte - pd.Timedelta(days=int(ventana))) & (a["fecha_evento"] <= corte)]["empresa_id"])
+    u = c.uso_beneficios()
+    fu = pd.to_datetime(u["fecha"])
+    activos_v = set(u[(u["es_fechado"] == 1) & (fu > corte - pd.Timedelta(days=int(ventana))) & (fu <= corte)]["empresa_id"])
     d = vig["dias_a_vencer"]
     pts_v = np.select([(d < 0) | (vig["estado_membresia"] == "Periodo de gracia"), d <= 30, d <= 60, d <= 90],
                       [pv30, pv30, pv60, pv90], 0)
     sin_part = ~vig["empresa_id"].isin(activos_v)
-    pts_p = np.where(sin_part, pp + np.where(vig["inscripciones_12m"] == 0, pp12, 0), 0)
+    pts_p = np.where(sin_part, pp + np.where(~vig["usa_beneficio_12m"].fillna(False).astype(bool), pp12, 0), 0)
     pts_s = np.where(vig["detractor_reciente"].fillna(False), int(p["pts_detractor"]),
                      np.where(vig["satisfaccion_promedio"] < umbral_sat, ps, 0))
     total = pts_v + pts_p + pts_s

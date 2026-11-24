@@ -43,12 +43,18 @@ FUENTES = {
     "encuesta_post_evento": "3. Encuestas y NPS/ENCUESTA-POST-EVENTOS (PRESENCIAL Y VIRTUAL)_anonimizada.xlsx",
     "base_afiliados": "5. Indicadores y reportes actuales/Base de datos afiliados ACTHO_anonimizada.xlsx",
 }
+# Fuentes opcionales: se procesan si el archivo existe (la encuesta de 90 días y la plantilla mensual de uso).
+FUENTES_OPCIONALES = {
+    "encuesta_90d": "3. Encuestas y NPS/90 días - NPS_sin respuestas (instrumento).xlsx",
+    "uso_beneficios": "8. Uso de beneficios/uso_beneficios.xlsx",
+}
 
 # Reglas de validación de la capa limpia (antes de cargar).
 LLAVES = {
     "dim_empresa": "empresa_id", "dim_persona": "persona_id", "dim_evento": "evento_id",
     "dim_ejecutiva": "ejecutiva_id", "fact_membresia": "registro_id",
     "fact_asistencia": "asistencia_id", "fact_encuesta_evento": "encuesta_id",
+    "dim_servicio": "servicio_id", "fact_uso_beneficio": "uso_id",
 }
 RELACIONES = [  # (tabla, columna, tabla destino, columna destino, admite nulos)
     ("dim_empresa", "ejecutiva_id", "dim_ejecutiva", "ejecutiva_id", False),
@@ -60,11 +66,16 @@ RELACIONES = [  # (tabla, columna, tabla destino, columna destino, admite nulos)
     ("fact_encuesta_evento", "empresa_id", "dim_empresa", "empresa_id", True),
     ("fact_encuesta_evento", "persona_id", "dim_persona", "persona_id", True),
     ("fact_encuesta_evento", "evento_id", "dim_evento", "evento_id", True),
+    ("fact_uso_beneficio", "empresa_id", "dim_empresa", "empresa_id", False),
+    ("fact_uso_beneficio", "servicio_id", "dim_servicio", "servicio_id", False),
+    ("fact_encuesta_relacion", "empresa_id", "dim_empresa", "empresa_id", True),
 ]
 RANGOS = [  # (tabla, columna, mínimo, máximo)
     ("fact_encuesta_evento", "nps_puntaje", 0, 10),
     ("fact_encuesta_evento", "satisfaccion_prom", 1, 5),
     ("fact_encuesta_evento", "satisfaccion_general", 1, 5),
+    ("fact_encuesta_relacion", "nps_actho", 0, 10),
+    ("fact_encuesta_relacion", "intencion_renovar", 1, 5),
 ]
 MINIMOS = {"dim_empresa": 100, "fact_asistencia": 100, "dim_evento": 1, "fact_encuesta_evento": 1}
 
@@ -100,8 +111,9 @@ def huellas_fuentes() -> dict:
     faltan = [r for r in FUENTES.values() if not (DATOS / r).exists()]
     if faltan:
         raise FileNotFoundError("Faltan archivos en Datos/:\n  - " + "\n  - ".join(faltan))
+    todas = dict(FUENTES, **{f: r for f, r in FUENTES_OPCIONALES.items() if (DATOS / r).exists()})
     return {f: {"archivo": r, "hash": sha256(DATOS / r), "bytes": (DATOS / r).stat().st_size}
-            for f, r in FUENTES.items()}
+            for f, r in todas.items()}
 
 
 def ultimas_huellas(conn) -> dict:
@@ -286,7 +298,8 @@ def ingesta_completa(fecha_corte=None, forzar=False, origen="setup") -> dict:
     hay_base = conn.execute("SELECT to_regclass('actho.v_empresa_360') IS NOT NULL").fetchone()[0]
     if not cambiadas and hay_base and not forzar:
         r = recalcular_riesgo(conn, fecha)
-        return {"estado": "sin_cambios", "fecha_corte": fecha, "semaforo": r["semaforo"]}
+        return {"estado": "sin_cambios", "fecha_corte": fecha, "semaforo": r["semaforo"],
+                "modelos": entrenar_modelos(conn, fecha)}
     ejec = iniciar_ejecucion(conn, f"{origen}__{datetime.now().isoformat(timespec='seconds')}", fecha, cambiadas)
     try:
         ejecutar_script("limpieza_datos.py", "--fecha-corte", fecha)
@@ -299,7 +312,26 @@ def ingesta_completa(fecha_corte=None, forzar=False, origen="setup") -> dict:
         cerrar_ejecucion(conn, ejec, "con_errores", {"error": str(e)[:2000]})
         raise
     r = recalcular_riesgo(conn, fecha)
-    return {"estado": "procesado", "fecha_corte": fecha, "fuentes_cambiadas": cambiadas, "semaforo": r["semaforo"]}
+    return {"estado": "procesado", "fecha_corte": fecha, "fuentes_cambiadas": cambiadas, "semaforo": r["semaforo"],
+            "modelos": entrenar_modelos(conn, fecha, forzar=True)}
+
+
+def entrenar_modelos(conn, fecha, forzar=False) -> str:
+    """Entrena los modelos de IA (src/modelos_ia.py) si cambiaron los datos o la fecha de corte.
+    Un error aquí no detiene la carga: el tablero sigue funcionando sin las secciones de IA."""
+    if not forzar:
+        try:
+            r = conn.execute("SELECT max(fecha_corte) FROM ia.modelo").fetchone()
+            if r and r[0] == str(fecha):
+                return "al día"
+        except Exception:  # noqa: BLE001
+            pass
+    try:
+        import modelos_ia
+        r = modelos_ia.entrenar(fecha)
+        return f"{len(r['modelos'])} entrenados en {r['segundos']} s"
+    except Exception as e:  # noqa: BLE001
+        return f"no se entrenaron ({type(e).__name__}: {str(e)[:200]})"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -326,10 +358,13 @@ def _cli():
         else:
             print("Datos procesados y cargados. Fuentes con cambios:", ", ".join(r.get("fuentes_cambiadas") or ["(forzado)"]))
         print(f"Semáforo al {r['fecha_corte']}: {r['semaforo']}")
+        print(f"Modelos de IA: {r.get('modelos', 'sin cambios')}")
         return
     if orden == "cambios":
         cambiadas = fuentes_cambiadas(huellas_fuentes(), ultimas_huellas(conn))
         print("Fuentes con cambios:", ", ".join(cambiadas) if cambiadas else "ninguna")
+    elif orden == "modelos":
+        print("Modelos de IA:", entrenar_modelos(conn, fecha or str(date.today()), forzar=True))
     elif orden == "recalcular":
         print(json.dumps(recalcular_riesgo(conn, fecha or (argumentos[1] if len(argumentos) > 1 else None)),
                          ensure_ascii=False, indent=2, default=str))

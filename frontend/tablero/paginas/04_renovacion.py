@@ -7,6 +7,18 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import comun as c
+import extracto
+
+
+@st.cache_data(ttl=300, show_spinner="Generando los extractos de valor…")
+def _zip_extractos(ids: tuple, corte: str) -> bytes:
+    todas_ = c.empresas()
+    sel = todas_[todas_["empresa_id"].isin(ids)]
+    u = c.uso_beneficios()
+    a = c.asistencia()
+    r = c.encuestas()
+    return extracto.zip_extractos(sel, u[u["empresa_id"].isin(ids)], a[a["empresa_id"].isin(ids)],
+                                  r[r["empresa_id"].isin(ids)], c.catalogo(), corte)
 
 c.encabezado("Renovación y retención", "Quién vence, quién está en riesgo y en qué cartera, a tiempo para actuar")
 
@@ -21,7 +33,7 @@ ventana = st.segmented_control("Ventana de vencimiento", [30, 60, 90], default=9
 ventana = ventana or 90
 prox = vig[(vig["dias_a_vencer"].between(0, ventana)) | (vig["rango_vencimiento"] == "Vencida")]
 
-renov = c.tabla("v_tasa_renovacion").iloc[0]
+renov = c.tasa_renovacion(todas)
 k = c.fila(5)
 c.kpi(k[0], f"Vencen en {ventana} días", c.fmt(vig["dias_a_vencer"].between(0, ventana).sum()),
       "Membresías vigentes por renovar", oscuro=True,
@@ -30,10 +42,11 @@ c.kpi(k[1], "Prioridad alta", c.fmt((prox["semaforo"] == "Rojo").sum()), "Con ri
       chip_=("Riesgo", "Contactar primero"))
 c.kpi(k[2], "Sin participación", c.fmt((~prox["participa_en_ventana"].astype(bool)).sum()),
       "Sin asistencias en 90 días", chip_=("Alerta", "Reactivar antes de renovar"))
-c.kpi(k[3], "Tasa de renovación", c.fmt(renov["tasa_renovacion_aprox"], 1, " %"), "Aproximada · últimos 12 meses",
-      chip_=("Alerta", "Meta 2027: 90 %"))
-c.kpi(k[4], "Retiros", c.fmt(renov["no_renovados"]), "Cancelados o expirados en 12 meses",
-      chip_=("Riesgo", "Motivo no registrado"))
+c.kpi(k[3], "Tasa de renovación", c.fmt(renov["tasa"], 1, " %"), f"{renov['tipo'].capitalize()} · últimos 12 meses · con los filtros",
+      chip_=("Alerta" if (renov["tasa"] or 0) < 90 else "OK", "Meta 2027: 90 %"),
+      ayuda_=c.ayuda("Tasa de renovación (medida)" if renov["tipo"] == "medida" else "Tasa de renovación (aproximada)"))
+c.kpi(k[4], "Retiros", c.fmt(renov["no_renovo"]), "No renovaron en 12 meses",
+      chip_=("Riesgo", "Motivo no registrado"), ayuda_=c.ayuda("Retiros"))
 
 izq, der = st.columns([2.3, 1], gap="medium")
 with izq:
@@ -54,11 +67,17 @@ with izq:
                              "inscripciones_12m": "Asist. 12m",
                              "satisfaccion_promedio": "Satisf.",
                              "motivos_riesgo": st.column_config.TextColumn("Motivos", width="large")})
-        b1, b2 = st.columns([1, 1])
+        b1, b2, b3 = st.columns([1.25, 1.25, 1])
         with b1:
             c.descargar(lista, f"vencimientos_{ventana}_dias.csv", "Exportar para campaña de renovación")
+        if len(lista):
+            b2.download_button(f"Extractos de valor ({c.fmt(len(lista))}, ZIP)",
+                               _zip_extractos(tuple(sorted(lista["empresa_id"])), str(p["fecha_corte"])),
+                               file_name=f"extractos_valor_{ventana}_dias.zip", mime="application/zip",
+                               icon=":material/folder_zip:", key="ren_zip",
+                               help="Un extracto por empresa de la lista, para llevar a la conversación de renovación")
         filas = sel.selection.rows if sel is not None and hasattr(sel, "selection") else []
-        if filas and b2.button("Abrir ficha 360°", **c.ancho(st.button)):
+        if filas and b3.button("Abrir ficha 360°", **c.ancho(st.button)):
             c.ir("03_ficha_360.py", lista.iloc[filas[0]]["empresa_id"])
 
     with c.tarjeta():

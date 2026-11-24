@@ -304,6 +304,18 @@ div[class*="st-key-limpiar_filtros"] button p {{ font-size: .76rem !important; }
 /* ── Gráficos interactivos: cursor de clic, como en Power BI ── */
 div[class*="st-key-gi_"] .nsewdrag, div[class*="st-key-gi_"] .pielayer path, div[class*="st-key-gi_"] .hm {{ cursor: pointer !important; }}
 
+/* ── Ícono de ayuda con la definición del indicador (hover o foco con teclado) ── */
+.kpi, .meta {{ position: relative; }}
+.ayuda {{ display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; margin-left:.35rem;
+  border-radius:50%; background:{C['lavanda']}; color:{C['morado']}; font-size:.62rem; font-weight:700; cursor:help;
+  vertical-align: middle; position: relative; text-transform:none; letter-spacing:0; }}
+.kpi.oscuro .ayuda {{ background: rgba(255,255,255,.2); color:#fff; }}
+.ayuda:hover::after, .ayuda:focus::after {{ content: attr(data-tip); position:absolute; left:50%; top:22px; transform:translateX(-50%);
+  width: 260px; background:{C['morado_900']}; color:#fff; font-size:.74rem; font-weight:400; line-height:1.4;
+  padding:.6rem .7rem; border-radius:10px; z-index:1000; text-align:left; white-space:normal; box-shadow:0 8px 24px rgba(43,10,107,.25); }}
+div[class*="st-key-acciones_encabezado"] {{ display:flex; justify-content:flex-end; margin-top:.35rem; }}
+div[class*="st-key-acciones_encabezado"] [data-testid="stHorizontalBlock"] {{ justify-content:flex-end; }}
+
 /* ── Accesibilidad: foco visible al navegar con teclado (WCAG 2.4.7) ── */
 a:focus-visible, button:focus-visible, [role="tab"]:focus-visible, input:focus-visible, [tabindex]:focus-visible {{
   outline: 3px solid {C['naranja']} !important; outline-offset: 2px !important; }}
@@ -386,6 +398,7 @@ def empresas() -> pd.DataFrame:
     fx = pd.to_datetime(df["fecha_expiracion"])
     df["mes_venc"] = fx.where(fx >= corte, corte).dt.strftime("%Y-%m").where(fx.notna())
     df["riesgo"] = df["semaforo"].map(SEM_TXT)
+    df["mes_alta"] = pd.to_datetime(df["fecha_afiliacion"]).dt.strftime("%Y-%m")
     return df
 
 
@@ -400,6 +413,73 @@ def encuestas() -> pd.DataFrame:
     extra = consulta("SELECT encuesta_id, lo_que_gusto, a_mejorar, temas_solicitados, calif_recepcion, "
                      "calif_manejo_tiempo FROM actho.fact_encuesta_evento")
     return df.merge(extra, on="encuesta_id", how="left")
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def uso_beneficios() -> pd.DataFrame:
+    """Una fila por uso de un beneficio (asistencia, comunidades, encuesta de 90 días, plantilla mensual)."""
+    if not existe("actho.v_uso_beneficio_detalle"):
+        return pd.DataFrame(columns=["empresa_id", "servicio", "linea_servicio", "fecha", "fuente", "es_fechado", "anio_mes"])
+    return tabla("v_uso_beneficio_detalle")
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def catalogo() -> pd.DataFrame:
+    return tabla("dim_servicio") if existe("actho.dim_servicio") else pd.DataFrame()
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def relacion() -> pd.DataFrame:
+    """Respuestas de la encuesta de relación a 90 días (sin pruebas)."""
+    if not existe("actho.v_encuesta_relacion_detalle"):
+        return pd.DataFrame(columns=["empresa_id", "fecha", "nps_actho", "nps_categoria", "intencion_renovar"])
+    return tabla("v_encuesta_relacion_detalle")
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def definiciones() -> pd.DataFrame:
+    if not existe("actho.definicion_indicador"):
+        return pd.DataFrame(columns=["orden", "indicador", "definicion", "calculo", "fuente", "estado"])
+    return consulta("SELECT * FROM actho.definicion_indicador ORDER BY orden")
+
+
+def ayuda(indicador: str) -> str:
+    """Definición acordable del indicador (tabla actho.definicion_indicador) para el ícono de ayuda."""
+    d = definiciones()
+    fila = d[d["indicador"] == indicador]
+    if fila.empty:
+        return ""
+    f = fila.iloc[0]
+    extra = f" Cálculo: {f['calculo']}" if isinstance(f["calculo"], str) and f["calculo"] else ""
+    return f"{f['definicion']}{extra} ({'definición acordada' if f['estado'] == 'Acordada' else 'propuesta por validar con ACTHO'})"
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def renovacion_medida() -> pd.DataFrame:
+    if not existe("historial.v_renovacion_medida"):
+        return pd.DataFrame()
+    return consulta("SELECT * FROM historial.v_renovacion_medida")
+
+
+def tasa_renovacion(e: pd.DataFrame) -> dict:
+    """Tasa de renovación sobre las empresas filtradas. Usa la medida (fotos mensuales) cuando ya hay
+    renovaciones registradas en los últimos 12 meses; si no, la aproximada."""
+    ids = set(e["empresa_id"])
+    rm = renovacion_medida()
+    if len(rm):
+        corte = pd.Timestamp(parametros()["fecha_corte"])
+        rm = rm[pd.to_datetime(rm["periodo"]) > corte - pd.DateOffset(months=12)]
+        rm = rm.sort_values("periodo").drop_duplicates(["empresa_id", "expiracion_anterior"], keep="last")
+        rm = rm[rm["empresa_id"].isin(ids) & rm["resultado"].isin(["Renovó", "No renovó"])]
+        if len(rm):
+            si, no = (rm["resultado"] == "Renovó").sum(), (rm["resultado"] == "No renovó").sum()
+            return dict(tasa=100 * si / (si + no), renovo=int(si), no_renovo=int(no), tipo="medida",
+                        nota=f"Medida con fotos mensuales: {fmt(si)} renovaron y {fmt(no)} no, de las que vencían")
+    sub = e[e["en_crm"] == 1] if "en_crm" in e else e
+    si, no = (sub["renovacion_aprox"] == "Renovó").sum(), (sub["renovacion_aprox"] == "No renovó").sum()
+    tasa = 100 * si / (si + no) if (si + no) else None
+    return dict(tasa=tasa, renovo=int(si), no_renovo=int(no), tipo="aproximada",
+                nota=f"Aproximada: {fmt(si)} renovados y {fmt(no)} no renovados en 12 meses")
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -425,8 +505,9 @@ FILTROS = [("nivel_2027", "Nivel 2027"), ("tipo_membresia", "Tipo de afiliado"),
 # asistencias o encuestas (y, por la empresa, todo lo demás), como una relación de Power BI.
 XF_DIMS = {
     "semaforo": ("Riesgo", "emp"), "nivel_2027": ("Nivel", "emp"), "mes_venc": ("Vence en", "emp"),
-    "ejecutiva": ("Ejecutiva", "emp"),
-    "anio_mes": ("Mes", "det"), "condicion_empresa": ("Empresa", "det"), "linea_2027": ("Línea", "det"),
+    "ejecutiva": ("Ejecutiva", "emp"), "tipo_membresia": ("Tipo", "emp"), "sector": ("Sector", "emp"),
+    "tamano_empresa": ("Tamaño", "emp"), "ciudad": ("Ciudad", "emp"), "mes_alta": ("Afiliada en", "emp"),
+    "anio_mes": ("Mes", "det"), "servicio": ("Beneficio", "det"), "fuente": ("Fuente", "det"), "condicion_empresa": ("Empresa", "det"), "linea_2027": ("Línea", "det"),
     "modalidad": ("Modalidad", "det"), "nivel_cargo": ("Cargo", "det"), "nps_categoria": ("NPS", "det"),
 }
 
@@ -447,7 +528,7 @@ def xf() -> dict:
 def valor_txt(dim, v) -> str:
     if dim == "semaforo":
         return riesgo_txt(v)
-    if dim in ("mes_venc", "anio_mes"):
+    if dim in ("mes_venc", "anio_mes", "mes_alta"):
         return anio_mes_txt(v)
     return str(v)
 
@@ -473,7 +554,8 @@ def barra_filtros():
     e = empresas()
     vig = e[e["es_vigente"] == 1]
     a = asistencia()
-    fmin, fmax = a["fecha_evento"].min().date(), a["fecha_evento"].max().date()
+    corte = pd.Timestamp(parametros()["fecha_corte"])
+    fmin, fmax = a["fecha_evento"].min().date(), max(a["fecha_evento"].max(), corte).date()
     st.session_state.setdefault("g_periodo", (fmin, fmax))
     with st.container(key="barra_filtros"):
         cols = st.columns([1.95, 1, 1, 1.1, 1, 1])
@@ -674,7 +756,10 @@ def _por_fecha(df, col_fecha):
     ini, fin = periodo()
     if ini is not None:
         f = pd.to_datetime(df[col_fecha])
-        df = df[(f >= ini) & (f <= fin)]
+        dentro = (f >= ini) & (f <= fin)
+        if "es_fechado" in df.columns:      # vinculaciones vigentes (comunidades) no dependen del periodo
+            dentro = dentro | (df["es_fechado"] == 0)
+        df = df[dentro]
     return df
 
 
@@ -691,7 +776,7 @@ def _ids_detalle(excluir=()):
     if not det:
         return None
     ids = set()
-    for df, col in ((asistencia(), "fecha_evento"), (encuestas(), "fecha_respuesta")):
+    for df, col in ((asistencia(), "fecha_evento"), (encuestas(), "fecha_respuesta"), (uso_beneficios(), "fecha")):
         if any(d in df.columns for d in det):
             ids |= set(_aplicar(_por_fecha(df, col), det)["empresa_id"].dropna())
     return ids
@@ -722,6 +807,11 @@ def filtrar_detalle(df: pd.DataFrame, col_fecha: str, excluir=()) -> pd.DataFram
         ids = set(filtrar_empresas(empresas(), excluir)["empresa_id"])
         df = df[df["empresa_id"].isin(ids)]
     return df
+
+
+def datos_uso(excluir=()) -> pd.DataFrame:
+    """Uso de beneficios con todos los filtros (las comunidades vigentes no dependen del periodo)."""
+    return filtrar_detalle(uso_beneficios(), "fecha", excluir)
 
 
 def datos(excluir=()):
@@ -759,7 +849,7 @@ def _e(t) -> str:
     return html.escape(str(t))
 
 
-def encabezado(titulo: str, subtitulo: str, pildoras: list | None = None, filtros: bool = True):
+def encabezado(titulo: str, subtitulo: str, pildoras: list | None = None, filtros: bool = True, acciones=None):
     """Componente 'Encabezado de página': título, subtítulo, tres píldoras de estado (tono, texto) y,
     debajo, la barra de filtros del tablero (filtros=False en páginas de una sola empresa o de datos)."""
     if pildoras is None:
@@ -775,6 +865,9 @@ def encabezado(titulo: str, subtitulo: str, pildoras: list | None = None, filtro
                  unsafe_allow_html=True)
     cuerpo = "".join(f'<span class="pildora {TONOS.get(t, "neutro")}"><i aria-hidden="true"></i>{txt}</span>' for t, txt in pildoras)
     der.markdown(f'<div class="pildoras" role="status">{cuerpo}</div>', unsafe_allow_html=True)
+    if acciones is not None:
+        with der, st.container(key="acciones_encabezado"):
+            acciones()
     if filtros:
         barra_filtros()
 
@@ -822,17 +915,24 @@ def _poner(col, contenido: str):
         col.markdown(contenido, unsafe_allow_html=True)
 
 
-def kpi(col, etiqueta, valor, nota="", oscuro=False, chip_=None):
-    """Componente 'KPI/Tarjeta': ETIQUETA, valor, chip (tono, texto) y nota."""
+def _icono_ayuda(texto: str) -> str:
+    if not texto:
+        return ""
+    t = _e(texto)
+    return f'<span class="ayuda" tabindex="0" role="note" aria-label="{t}" data-tip="{t}">?</span>'
+
+
+def kpi(col, etiqueta, valor, nota="", oscuro=False, chip_=None, ayuda_=""):
+    """Componente 'KPI/Tarjeta': ETIQUETA, valor, chip (tono, texto) y nota. ayuda_ = definición del indicador."""
     ch = chip(chip_[1], chip_[0]) if chip_ else ""
-    _poner(col, f'<div class="kpi{" oscuro" if oscuro else ""}"><div class="et">{_e(etiqueta)}</div>'
+    _poner(col, f'<div class="kpi{" oscuro" if oscuro else ""}"><div class="et">{_e(etiqueta)}{_icono_ayuda(ayuda_)}</div>'
                 f'<div class="va">{valor}</div>{ch}<div class="no">{nota}</div></div>')
 
 
-def meta(col, etiqueta, actual, objetivo, nota="", sufijo="%", chip_=None):
+def meta(col, etiqueta, actual, objetivo, nota="", sufijo="%", chip_=None, ayuda_=""):
     pct = 0 if actual is None or pd.isna(actual) else max(0, min(100, 100 * actual / objetivo))
     ch = chip(chip_[1], chip_[0]) if chip_ else ""
-    _poner(col, f'<div class="meta"><div class="et-meta">{_e(etiqueta)}</div>'
+    _poner(col, f'<div class="meta"><div class="et-meta">{_e(etiqueta)}{_icono_ayuda(ayuda_)}</div>'
                 f'<div class="fila"><span class="va">{fmt(actual, 1, sufijo)}</span>'
                 f'<span class="obj">meta 2027: {fmt(objetivo, 0, sufijo)}</span> {ch}</div>'
                 f'<div class="barra"><div style="width:{pct:.0f}%"></div></div><div class="no">{nota}</div></div>')

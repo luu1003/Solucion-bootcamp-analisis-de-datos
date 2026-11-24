@@ -19,6 +19,7 @@ USO = {
     "Asistentes no afiliados": "Comunicación de afiliación desde canales propios",
     "Afiliados de un solo contacto": "Abrir la relación a más personas del área y a otros niveles",
     "Nuevos afiliados": "Secuencia de bienvenida y encuesta de 90 días",
+    "Encuesta de 90 días por enviar": "Cumplen 90 días o les faltan unos 60 para renovar: medir NPS e intención de renovar",
 }
 
 res = seg.groupby("segmento").agg(personas=("persona_id", "count"), empresas=("empresa_id", "nunique"),

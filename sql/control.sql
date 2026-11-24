@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS ingesta.lote_carga (
     ejecucion_id  bigint REFERENCES ingesta.ejecucion(id),
     fuente        text NOT NULL CHECK (fuente IN ('zoho_crm', 'asistencia_excel', 'encuesta_presencial',
                                                   'encuesta_virtual', 'encuesta_post_evento', 'base_afiliados',
-                                                  'encuesta_90d')),
+                                                  'encuesta_90d', 'uso_beneficios')),
     archivo       text NOT NULL,
     hash_sha256   char(64) NOT NULL,
     bytes         bigint,
@@ -35,6 +35,11 @@ CREATE TABLE IF NOT EXISTS ingesta.lote_carga (
     cargado_en    timestamptz NOT NULL DEFAULT now(),
     UNIQUE (fuente, hash_sha256)          -- el mismo archivo no se registra dos veces
 );
+-- Bases creadas antes de agregar la plantilla de uso de beneficios: se actualiza la lista de fuentes válidas.
+ALTER TABLE ingesta.lote_carga DROP CONSTRAINT IF EXISTS lote_carga_fuente_check;
+ALTER TABLE ingesta.lote_carga ADD CONSTRAINT lote_carga_fuente_check
+    CHECK (fuente IN ('zoho_crm', 'asistencia_excel', 'encuesta_presencial', 'encuesta_virtual',
+                      'encuesta_post_evento', 'base_afiliados', 'encuesta_90d', 'uso_beneficios'));
 
 -- Semáforo por empresa en cada fecha de corte (permite ver cómo evoluciona el riesgo).
 CREATE TABLE IF NOT EXISTS historial.evaluacion_riesgo (
@@ -94,3 +99,20 @@ SELECT periodo,
 FROM pares
 GROUP BY periodo
 ORDER BY periodo;
+
+-- Renovación medida por empresa: membresías vigentes que vencían antes del mes siguiente y qué pasó en la foto
+-- de ese mes. 'Pendiente' = sigue vigente sin nueva fecha (p. ej. en periodo de gracia).
+CREATE OR REPLACE VIEW historial.v_renovacion_medida AS
+WITH periodos AS (
+    SELECT periodo, lag(periodo) OVER (ORDER BY periodo) AS periodo_anterior
+    FROM (SELECT DISTINCT periodo FROM historial.snapshot_membresia) d
+)
+SELECT p.periodo, b.empresa_id, b.nivel_2027, b.ejecutiva,
+       b.fecha_expiracion AS expiracion_anterior, a.fecha_expiracion AS expiracion_nueva,
+       CASE WHEN a.es_vigente = 1 AND a.fecha_expiracion > b.fecha_expiracion THEN 'Renovó'
+            WHEN coalesce(a.es_vigente, 0) = 0 THEN 'No renovó'
+            ELSE 'Pendiente' END AS resultado
+FROM historial.snapshot_membresia b
+JOIN periodos p ON b.periodo = p.periodo_anterior
+LEFT JOIN historial.snapshot_membresia a ON a.periodo = p.periodo AND a.empresa_id = b.empresa_id
+WHERE b.es_vigente = 1 AND b.fecha_expiracion < p.periodo;

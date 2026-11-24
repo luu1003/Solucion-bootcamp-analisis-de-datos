@@ -10,15 +10,19 @@ Qué hace (y se salta lo que ya esté listo):
   1. Verifica Python y crea el entorno virtual .venv (si falta o es de otro equipo).
   2. Instala las librerías de requirements.txt (solo si cambiaron).
   3. Configura VS Code para usar .venv.
-  4. Prepara PostgreSQL, en este orden:
+  4. Prepara PostgreSQL sin preguntar nada, en este orden:
        a) la base de .env / DATABASE_URL, si responde;
        b) Docker Desktop (docker compose up -d postgres), si está abierto;
        c) PostgreSQL instalado en el equipo (Homebrew, Postgres.app…): crea una base propia
-          del proyecto en .pgdata/ (puerto 5433), sin permisos de administrador;
-       d) si no hay ninguno, pregunta [Y/n] e instala PostgreSQL 16 portátil en .postgres/
-          (descarga única de ≈30 MB, sin administrador) y sigue como en c).
+          del proyecto (puerto 5433 o el siguiente libre), sin permisos de administrador;
+       d) si no hay ninguno, instala PostgreSQL 16 portátil (descarga única de ≈30 MB) y sigue como en c);
+       e) si eso falla y Docker Desktop está instalado pero cerrado, lo abre y lo usa.
+     Los archivos de PostgreSQL van FUERA del proyecto (macOS: ~/Library/Application Support/ACTHO,
+     Windows: %LOCALAPPDATA%\\ACTHO, Linux: ~/.local/share/actho) porque iCloud/OneDrive vuelven
+     lentísimo el arranque. Si una versión anterior dejó .pgdata/ en el proyecto, se mueve allá.
   5. Procesa los datos de Datos/ solo si algún archivo cambió desde la última carga
-     (limpieza, validación, carga, verificación) y recalcula el semáforo de hoy.
+     (limpieza, validación, carga, verificación), recalcula el semáforo de hoy y entrena
+     los modelos de IA (src/modelos_ia.py).
   6. Arranca el tablero en http://localhost:8501 y lo abre en Google Chrome.
      Usuario inicial: admin · contraseña: actho.  Ctrl+C para detenerlo.
 
@@ -30,7 +34,7 @@ Opciones:
     --sin-tablero              procesa los datos pero no abre el tablero
     --sin-navegador            arranca el tablero sin abrir el navegador
     --puerto N                 puerto del tablero (por defecto 8501 o el siguiente libre)
-    -y, --si                   responde sí a las preguntas (instala PostgreSQL sin preguntar)
+    -y, --si                   (se mantiene por compatibilidad: ya no se pregunta nada)
 
 Solo usa la librería estándar de Python, así que corre antes de instalar nada.
 """
@@ -61,8 +65,27 @@ SISTEMA = platform.system()
 PY_VENV = VENV / ("Scripts/python.exe" if ES_WINDOWS else "bin/python")
 HASH_REQ = VENV / ".requirements.sha256"
 ENV = RAIZ / ".env"
-PGDATA = RAIZ / ".pgdata"
-PGBIN_PROYECTO = RAIZ / ".postgres"          # PostgreSQL portátil que instala setup.py si hace falta
+
+
+
+def _carpeta_datos_usuario() -> Path:
+    """PostgreSQL guarda sus archivos fuera del proyecto: si el proyecto está en una carpeta sincronizada
+    (iCloud Documentos, OneDrive, Dropbox), cada escritura se sincroniza y el servidor tarda minutos en arrancar."""
+    if os.environ.get("ACTHO_DATOS"):
+        return Path(os.environ["ACTHO_DATOS"])
+    if SISTEMA == "Darwin":
+        return Path.home() / "Library" / "Application Support" / "ACTHO"
+    if ES_WINDOWS:
+        return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "ACTHO"
+    return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "actho"
+
+
+DATOS_USUARIO = _carpeta_datos_usuario()
+PGDATA = DATOS_USUARIO / "pgdata"
+PGBIN_PROYECTO = DATOS_USUARIO / "postgres"   # PostgreSQL portátil que instala setup.py si hace falta
+LEGADO_PGDATA = RAIZ / ".pgdata"              # ubicación de versiones anteriores (dentro del proyecto)
+LEGADO_BIN = RAIZ / ".postgres"
+MARCA_CONF = "# --- configuración del proyecto ACTHO (setup.py) ---"
 PGSERVER_VERSION = "0.1.4"                    # paquete de PyPI que trae los binarios de PostgreSQL 16
 PGSERVER_PLATAFORMAS = {
     ("Darwin", "arm64"): "macosx_11_0_arm64",
@@ -72,7 +95,6 @@ PGSERVER_PLATAFORMAS = {
 }
 PG_PUERTO_LOCAL = 5433
 URL_DOCKER = "postgresql://postgres:postgres@localhost:5432/actho"
-URL_LOCAL = f"postgresql://postgres@localhost:{PG_PUERTO_LOCAL}/actho"
 APP = "frontend/tablero/Inicio.py"
 
 DATOS_REQUERIDOS = [
@@ -184,7 +206,7 @@ def instalar_librerias():
     ejecutar([PY_VENV, "-m", "pip", "install", "--upgrade", "pip", "--quiet", "--disable-pip-version-check"])
     if ejecutar([PY_VENV, "-m", "pip", "install", "-r", req, "--quiet", "--disable-pip-version-check"]).returncode != 0:
         fallar("Falló la instalación de librerías.", "Revisa tu conexión a internet y vuelve a correr este archivo.")
-    r = ejecutar([PY_VENV, "-c", "import pandas, numpy, openpyxl, psycopg, streamlit, plotly"], capture_output=True, text=True)
+    r = ejecutar([PY_VENV, "-c", "import pandas, numpy, openpyxl, psycopg, streamlit, plotly, sklearn, statsmodels"], capture_output=True, text=True)
     if r.returncode != 0:
         fallar("Las librerías no quedaron bien instaladas.", r.stderr[-800:] + "\nPrueba:  python3 setup.py --reinstalar")
     HASH_REQ.write_text(huella)
@@ -275,16 +297,19 @@ def carpeta_bin_postgres():
         candidatos += sorted(glob.glob(r"C:\Program Files\PostgreSQL\*\bin"), reverse=True)
     else:
         candidatos += sorted(glob.glob("/usr/lib/postgresql/*/bin"), reverse=True)
+    candidatos.append(str(LEGADO_BIN / "pgserver" / "pginstall" / "bin"))
     ext = ".exe" if ES_WINDOWS else ""
     for c in candidatos:
-        if (Path(c) / f"pg_ctl{ext}").exists() and (Path(c) / f"initdb{ext}").exists():
-            return Path(c)
+        b = Path(c)
+        if (b / f"pg_ctl{ext}").exists() and (b / f"initdb{ext}").exists():
+            if ejecutar([b / f"postgres{ext}", "--version"], capture_output=True).returncode == 0:
+                return b
     return None
 
 
 def instalar_postgres_portatil():
-    """Descarga PostgreSQL 16 (binarios del paquete pgserver de PyPI) en .postgres/ dentro del proyecto.
-    No pide permisos de administrador, no toca el sistema y se borra con solo eliminar la carpeta."""
+    """Descarga PostgreSQL 16 (binarios del paquete pgserver de PyPI) en la carpeta de datos del usuario.
+    No pide permisos de administrador y no toca el sistema."""
     import zipfile
     clave = (SISTEMA, "arm64" if platform.machine().lower() in ("arm64", "aarch64") and SISTEMA == "Darwin"
              else platform.machine())
@@ -292,7 +317,7 @@ def instalar_postgres_portatil():
     if not plataforma:
         aviso(f"No hay PostgreSQL portátil para {SISTEMA} {platform.machine()}.")
         return None
-    descarga = RAIZ / ".postgres_descarga"
+    descarga = DATOS_USUARIO / "descarga"
     shutil.rmtree(descarga, ignore_errors=True)
     info("Descargando PostgreSQL 16 (≈30 MB, una sola vez)…")
     r = ejecutar([PY_VENV, "-m", "pip", "download", f"pgserver=={PGSERVER_VERSION}", "--no-deps",
@@ -302,7 +327,7 @@ def instalar_postgres_portatil():
     if r.returncode != 0 or not ruedas:
         aviso("No se pudo descargar PostgreSQL: " + (r.stderr or r.stdout)[-300:])
         return None
-    info("Instalando PostgreSQL en .postgres/ …")
+    info(f"Instalando PostgreSQL en {PGBIN_PROYECTO} …")
     shutil.rmtree(PGBIN_PROYECTO, ignore_errors=True)
     # Se extrae el paquete completo: las librerías compartidas viven junto a pginstall/
     # (pgserver.libs/ en Linux, pgserver/.dylibs/ en macOS) y los binarios las buscan por ruta relativa.
@@ -325,76 +350,236 @@ def instalar_postgres_portatil():
     if v.returncode != 0:
         aviso("PostgreSQL se descargó pero no arranca en este equipo: " + (v.stderr or v.stdout)[-300:])
         return None
-    ok(f"Instalado {v.stdout.strip()} en .postgres/")
+    ok(f"Instalado {v.stdout.strip()}")
     return bindir
 
 
-def postgres_local(bindir: Path):
-    ext = ".exe" if ES_WINDOWS else ""
-    pg_ctl, initdb = str(bindir / f"pg_ctl{ext}"), str(bindir / f"initdb{ext}")
-    if not (PGDATA / "PG_VERSION").exists():
-        info(f"Creando una base PostgreSQL propia del proyecto en .pgdata/ ({bindir})…")
-        r = ejecutar([initdb, "-D", PGDATA, "-U", "postgres", "--auth=trust", "-E", "UTF8", "--locale=C"],
+def _pg(bindir, nombre):
+    return str(bindir / (nombre + (".exe" if ES_WINDOWS else "")))
+
+
+def _cola_log(n=12):
+    log = PGDATA / "servidor.log"
+    if not log.exists():
+        return ""
+    lineas = log.read_text(encoding="utf-8", errors="ignore").splitlines()
+    return "\n".join(lineas[-n:])
+
+
+def _puerto_conf():
+    conf = PGDATA / "postgresql.conf"
+    if conf.exists():
+        for linea in reversed(conf.read_text(encoding="utf-8", errors="ignore").splitlines()):
+            if linea.strip().startswith("port ="):
+                try:
+                    return int(linea.split("=", 1)[1].split("#")[0].strip())
+                except ValueError:
+                    break
+    return PG_PUERTO_LOCAL
+
+
+def _fijar_puerto(puerto):
+    conf = PGDATA / "postgresql.conf"
+    texto = conf.read_text(encoding="utf-8", errors="ignore")
+    if MARCA_CONF in texto:
+        texto = texto[:texto.index(MARCA_CONF)].rstrip("\n") + "\n"
+    # Solo TCP en localhost: no depende de carpetas de sockets del sistema ni de permisos de administrador.
+    # synchronous_commit = off: más rápido en equipos personales; la base se reconstruye desde Datos/.
+    texto += (f"\n{MARCA_CONF}\nport = {puerto}\nlisten_addresses = 'localhost'\nunix_socket_directories = ''\n"
+              "synchronous_commit = off\nmax_connections = 50\n")
+    conf.write_text(texto, encoding="utf-8")
+
+
+def _puerto_ocupado(p):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(1)
+        return s.connect_ex(("127.0.0.1", p)) == 0
+
+
+def _servidor_vivo(bindir):
+    return ejecutar([_pg(bindir, "pg_ctl"), "status", "-D", PGDATA], capture_output=True).returncode == 0
+
+
+def _detener(bindir, datos):
+    """Detiene un servidor de una carpeta de datos (rápido y, si no responde, inmediato)."""
+    for modo, espera in (("fast", "30"), ("immediate", "30")):
+        r = ejecutar([_pg(bindir, "pg_ctl"), "stop", "-D", datos, "-m", modo, "-w", "-t", espera],
                      capture_output=True, text=True)
+        if r.returncode == 0 or "no server running" in (r.stderr + r.stdout).lower():
+            return True
+    pid = datos / "postmaster.pid"
+    if pid.exists() and not ES_WINDOWS:
+        try:
+            os.kill(int(pid.read_text().splitlines()[0]), signal.SIGQUIT)
+            time.sleep(3)
+            return True
+        except (OSError, ValueError, IndexError):
+            pass
+    return False
+
+
+def migrar_legado(bindir):
+    """Versiones anteriores guardaban la base dentro del proyecto (.pgdata/). Si el proyecto está en una
+    carpeta sincronizada (iCloud, OneDrive, Dropbox), PostgreSQL tarda minutos en arrancar: se mueve fuera."""
+    if not (LEGADO_PGDATA / "PG_VERSION").exists():
+        return
+    if (PGDATA / "PG_VERSION").exists():
+        if (LEGADO_PGDATA / "postmaster.pid").exists():
+            _detener(bindir, LEGADO_PGDATA)     # el servidor viejo ocuparía el puerto
+        return
+    info("Moviendo la base de PostgreSQL fuera de la carpeta del proyecto (evita la lentitud de iCloud)…")
+    _detener(bindir, LEGADO_PGDATA)
+    PGDATA.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.move(str(LEGADO_PGDATA), str(PGDATA))
+        for f in ("postmaster.pid", "postmaster.opts"):
+            (PGDATA / f).unlink(missing_ok=True)
+        ok(f"Base movida a {PGDATA}")
+    except OSError as e:
+        aviso(f"No se pudo mover la base anterior ({e}); se crea una nueva (los datos se recargan desde Datos/).")
+        shutil.rmtree(PGDATA, ignore_errors=True)
+
+
+def _esperar_conexion(puerto, segundos=600):
+    """Espera a que el servidor acepte conexiones, mostrando avance si tarda (recuperación tras un apagado)."""
+    url = f"postgresql://postgres@localhost:{puerto}/postgres"
+    inicio = time.time()
+    ultimo = inicio
+    while time.time() - inicio < segundos:
+        if responde(url):
+            return True
+        if time.time() - ultimo > 20:
+            ultimo = time.time()
+            cola = _cola_log(1)
+            info(f"PostgreSQL sigue arrancando ({int(time.time() - inicio)} s)… {cola[-110:]}")
+        time.sleep(2)
+    return False
+
+
+def postgres_local(bindir: Path):
+    migrar_legado(bindir)
+    PGDATA.parent.mkdir(parents=True, exist_ok=True)
+    if not (PGDATA / "PG_VERSION").exists():
+        shutil.rmtree(PGDATA, ignore_errors=True)
+        info(f"Creando la base PostgreSQL del proyecto en {PGDATA}…")
+        r = ejecutar([_pg(bindir, "initdb"), "-D", PGDATA, "-U", "postgres", "--auth=trust", "-E", "UTF8",
+                      "--locale=C"], capture_output=True, text=True)
         if r.returncode != 0:
             aviso("initdb no pudo crear la base: " + (r.stderr or r.stdout)[-400:])
+            if "root" in (r.stderr or ""):
+                aviso("PostgreSQL no se puede iniciar como administrador (root). Corre setup.py con tu usuario normal.")
             return None
-    conf = PGDATA / "postgresql.conf"
-    marca = "# --- configuración del proyecto ACTHO (setup.py) ---"
-    if marca not in conf.read_text(encoding="utf-8", errors="ignore"):
-        # Solo TCP en localhost: no depende de carpetas de sockets del sistema ni de permisos de administrador.
-        with open(conf, "a", encoding="utf-8") as f:
-            f.write(f"\n{marca}\nport = {PG_PUERTO_LOCAL}\nlisten_addresses = 'localhost'\n"
-                    "unix_socket_directories = ''\n")
-    if ejecutar([pg_ctl, "status", "-D", PGDATA], capture_output=True).returncode != 0:
-        info(f"Iniciando PostgreSQL local en el puerto {PG_PUERTO_LOCAL}…")
-        r = ejecutar([pg_ctl, "start", "-D", PGDATA, "-l", PGDATA / "servidor.log", "-w", "-t", "60"],
+        _fijar_puerto(PG_PUERTO_LOCAL)
+    elif MARCA_CONF not in (PGDATA / "postgresql.conf").read_text(encoding="utf-8", errors="ignore"):
+        _fijar_puerto(PG_PUERTO_LOCAL)
+    puerto = _puerto_conf()
+    if not _servidor_vivo(bindir):
+        if _puerto_ocupado(puerto):
+            nuevo = puerto_libre(puerto + 1)
+            aviso(f"El puerto {puerto} lo usa otro programa; PostgreSQL del proyecto usará el {nuevo}.")
+            puerto = nuevo
+            _fijar_puerto(puerto)
+        info(f"Iniciando PostgreSQL local en el puerto {puerto}…")
+        r = ejecutar([_pg(bindir, "pg_ctl"), "start", "-D", PGDATA, "-l", PGDATA / "servidor.log", "-w", "-t", "120"],
                      capture_output=True, text=True)
-        if r.returncode != 0:
-            aviso("No arrancó PostgreSQL local. Mira .pgdata/servidor.log")
+        if r.returncode != 0 and not _servidor_vivo(bindir):
+            aviso("No arrancó PostgreSQL local:\n" + ((r.stderr or r.stdout)[-300:] + "\n" + _cola_log()).strip())
             return None
-    crear = ("import psycopg; c = psycopg.connect('postgresql://postgres@localhost:%d/postgres', autocommit=True);"
+    if not _esperar_conexion(puerto):
+        aviso("PostgreSQL no aceptó conexiones a tiempo:\n" + _cola_log())
+        return None
+    crear = ("import sys, psycopg; c = psycopg.connect(sys.argv[1], autocommit=True);"
              "c.execute('CREATE DATABASE actho') if not c.execute(\"SELECT 1 FROM pg_database WHERE datname='actho'\")"
-             ".fetchone() else None" % PG_PUERTO_LOCAL)
-    ejecutar([PY_VENV, "-c", crear], capture_output=True)
-    return URL_LOCAL if responde(URL_LOCAL, espera=20) else None
+             ".fetchone() else None")
+    r = ejecutar([PY_VENV, "-c", crear, f"postgresql://postgres@localhost:{puerto}/postgres"],
+                 capture_output=True, text=True)
+    if r.returncode != 0:
+        aviso("No se pudo crear la base 'actho': " + r.stderr[-300:])
+    url = f"postgresql://postgres@localhost:{puerto}/actho"
+    return url if responde(url, espera=20) else None
+
+
+def abrir_docker_desktop():
+    """Si Docker está instalado pero cerrado, lo abre y espera a que responda."""
+    if not shutil.which("docker") and not (SISTEMA == "Darwin" and Path("/Applications/Docker.app").exists()):
+        return False
+    if SISTEMA == "Darwin":
+        ejecutar(["open", "-a", "Docker"], capture_output=True)
+    elif ES_WINDOWS:
+        exe = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Docker" / "Docker" / "Docker Desktop.exe"
+        if exe.exists():
+            subprocess.Popen([str(exe)])
+    else:
+        return False
+    info("Abriendo Docker Desktop (hasta 2 minutos)…")
+    fin = time.time() + 120
+    while time.time() < fin:
+        if docker_disponible():
+            return True
+        time.sleep(3)
+    return False
+
+
+def _listo(u, bindir=None, donde=""):
+    guardar_url(u)
+    ok(f"PostgreSQL listo ({u.split('@')[-1]}{donde})")
+    return u, bindir
 
 
 def asegurar_postgres(auto=False):
+    """Prueba, en orden, hasta dejar una base funcionando. No pregunta nada: instala lo que falte."""
     url = url_configurada()
+    if (LEGADO_BIN / "pgserver").exists() and not PGBIN_PROYECTO.exists():
+        try:
+            PGBIN_PROYECTO.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(LEGADO_BIN), str(PGBIN_PROYECTO))
+            ok(f"PostgreSQL portátil movido fuera del proyecto ({PGBIN_PROYECTO})")
+        except OSError:
+            pass
+    if (LEGADO_PGDATA / "PG_VERSION").exists():
+        # Base de una versión anterior dentro del proyecto: se mueve fuera antes de usarla
+        bindir = carpeta_bin_postgres()
+        u = postgres_local(bindir) if bindir else None
+        if u:
+            return _listo(u, bindir, f", datos en {PGDATA}")
     if url and responde(url):
         salto("PostgreSQL ya está disponible (" + url.split("@")[-1] + ")")
         return url, None
-    if url == URL_DOCKER or url is None:
-        if docker_disponible():
-            u = postgres_docker()
-            if u:
-                guardar_url(u)
-                ok("PostgreSQL corriendo en Docker (localhost:5432)")
-                return u, None
+    if url and url != URL_DOCKER and "localhost" not in url and "127.0.0.1" not in url:
+        aviso(f"La base configurada en .env ({url.split('@')[-1]}) no responde; se usa una local.")
+    intentos = []
+    if (url == URL_DOCKER or url is None) and docker_disponible():
+        u = postgres_docker()
+        if u:
+            return _listo(u, None, ", Docker")
+        intentos.append("Docker está abierto pero el contenedor de PostgreSQL no arrancó")
     bindir = carpeta_bin_postgres()
     if bindir:
         u = postgres_local(bindir)
         if u:
-            guardar_url(u)
-            ok(f"PostgreSQL local del proyecto corriendo (localhost:{PG_PUERTO_LOCAL}, datos en .pgdata/)")
-            return u, bindir
-    aviso("No encontré PostgreSQL ni Docker en este equipo.")
-    if preguntar("¿Instalo PostgreSQL 16 ahora dentro del proyecto (sin permisos de administrador)?", auto=auto):
+            return _listo(u, bindir, f", datos en {PGDATA}")
+        intentos.append(f"PostgreSQL de {bindir} no arrancó")
+    if not (PGBIN_PROYECTO / "pgserver" / "pginstall" / "bin").exists():
+        info("No hay PostgreSQL en este equipo: se instala uno portátil (sin permisos de administrador).")
         bindir = instalar_postgres_portatil()
         if bindir:
             u = postgres_local(bindir)
             if u:
-                guardar_url(u)
-                ok(f"PostgreSQL local del proyecto corriendo (localhost:{PG_PUERTO_LOCAL}, datos en .pgdata/)")
-                return u, bindir
+                return _listo(u, bindir, f", datos en {PGDATA}")
+            intentos.append("el PostgreSQL portátil no arrancó")
+        else:
+            intentos.append("no se pudo descargar el PostgreSQL portátil")
+    if not docker_disponible() and abrir_docker_desktop():
+        u = postgres_docker()
+        if u:
+            return _listo(u, None, ", Docker")
     instr = {"Darwin": "Opción 1: instala Docker Desktop y ábrelo.\n"
                        "Opción 2: brew install postgresql@16   (o instala Postgres.app)",
              "Windows": "Opción 1: instala Docker Desktop y ábrelo.\n"
                         "Opción 2: instala PostgreSQL 16 desde https://www.postgresql.org/download/windows/"}
-    fallar("No hay PostgreSQL disponible para el tablero.",
+    fallar("No hay PostgreSQL disponible para el tablero. Se intentó: " + "; ".join(intentos or ["nada aplicable"]),
            instr.get(SISTEMA, "Instala Docker o PostgreSQL 16 (sudo apt install postgresql).") +
-           "\nLuego vuelve a correr:  python3 setup.py")
+           f"\nRegistro del servidor: {PGDATA / 'servidor.log'}\nLuego vuelve a correr:  python3 setup.py")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -418,6 +603,8 @@ def procesar_datos(url, fecha_corte, forzar):
             ok(linea)
         elif linea.startswith("Semáforo al"):
             ok(linea)
+        elif linea.startswith("Modelos de IA"):
+            (aviso if "no se entrenaron" in linea else ok)(linea)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

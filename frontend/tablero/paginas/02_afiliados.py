@@ -35,8 +35,9 @@ if buscar:
 k = c.fila(4)
 c.kpi(k[0], "Empresas en la lista", c.fmt(len(e)), f"Universo: {universo.lower() if universo else 'vigentes'}", oscuro=True,
       chip_=("Morado", f"{c.fmt(e['ejecutiva'].nunique())} ejecutivas"))
-c.kpi(k[1], "Participación activa", c.fmt(100 * e["participa_en_ventana"].mean() if len(e) else None, 1, " %"),
-      "Con asistencia en los últimos 90 días", chip_=("Alerta", f"{c.fmt((~e['participa_en_ventana'].astype(bool)).sum())} sin asistir"))
+c.kpi(k[1], "Uso de beneficios", c.fmt(100 * e["participa_en_ventana"].mean() if len(e) else None, 1, " %"),
+      "Usaron algún beneficio en los últimos 90 días", chip_=("Alerta", f"{c.fmt((~e['participa_en_ventana'].astype(bool)).sum())} sin uso"),
+      ayuda_=c.ayuda("Uso de beneficios"))
 c.kpi(k[2], "Satisfacción promedio", c.fmt(e["satisfaccion_promedio"].mean(), 2), "Escala 1 a 5 · últimos 12 meses",
       chip_=("OK", f"{c.fmt(e['satisfaccion_promedio'].notna().sum())} con encuestas"))
 c.kpi(k[3], "Riesgo alto de no renovar", c.fmt((e["semaforo"] == "Rojo").sum()), "Empresas con riesgo alto",
@@ -45,7 +46,7 @@ c.kpi(k[3], "Riesgo alto de no renovar", c.fmt((e["semaforo"] == "Rojo").sum()),
 orden = e.sort_values(["puntaje_riesgo", "dias_a_vencer"], ascending=[False, True])
 vista = orden[["empresa_id", "semaforo", "puntaje_riesgo", "nivel_2027", "tipo_membresia", "estado_membresia",
                "ejecutiva", "sector", "ciudad", "dias_a_vencer", "inscripciones_12m", "personas_distintas",
-               "ultima_asistencia", "satisfaccion_promedio", "motivos_riesgo"]].copy()
+               "ultima_asistencia", "pct_aprovechamiento", "satisfaccion_promedio", "motivos_riesgo"]].copy()
 vista["satisfaccion_promedio"] = vista["satisfaccion_promedio"].map(lambda v: c.fmt(v, 2))
 vista["semaforo"] = vista["semaforo"].map(c.SEM_TXT).fillna("Sin evaluar")
 
@@ -65,6 +66,8 @@ with izq, c.tarjeta():
             "personas_distintas": st.column_config.NumberColumn("Personas"),
             "ultima_asistencia": st.column_config.DateColumn("Última asistencia", format="DD/MM/YYYY"),
             "satisfaccion_promedio": "Satisf.",
+            "pct_aprovechamiento": st.column_config.ProgressColumn("Aprovecha nivel", min_value=0, max_value=100, format="%.0f %%",
+                                                                   help="Beneficios incluidos en su nivel que usó en 12 meses"),
             "motivos_riesgo": st.column_config.TextColumn("Motivos", width="large"),
         })
     c.descargar(vista, "afiliados_actho.csv", "Exportar lista (CSV)")

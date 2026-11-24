@@ -812,10 +812,13 @@ Tablas de apoyo sin relaciones: `reporte_calidad` (hallazgos de la limpieza), `d
 | `fact_asistencia` | persona inscrita en un evento | 3.304 | `asistencia_id` | `evento_id`, `empresa_id`, `persona_id` |
 | `fact_encuesta_evento` | respuesta de encuesta (presencial, virtual, post-evento) | 778 | `encuesta_id` (+ `respuesta_id` único) | `evento_id`, `empresa_id`, `persona_id` |
 | `fact_encuesta_temas` | tema pedido en una respuesta | 96 | — | `encuesta_id` |
-| `reporte_calidad` | hallazgo de calidad | 61 | — | — |
-| `diccionario_datos` | campo de una tabla | 135 | — | — |
+| `dim_servicio` | servicio de la oferta 2027 (catálogo del documento de equivalencias) | 18 | `servicio_id` | — |
+| `fact_uso_beneficio` | uso de un beneficio (asistencia, comunidad vigente, encuesta de 90 días o plantilla mensual) | 3.919 | `uso_id` | `empresa_id`, `servicio_id` |
+| `fact_encuesta_relacion` | respuesta de la encuesta de relación a 90 días (NPS de ACTHO) | 0 (lista para recibir) | `respuesta_id` | `empresa_id` |
+| `reporte_calidad` | hallazgo de calidad | 66 | — | — |
+| `diccionario_datos` | campo de una tabla | 180 | — | — |
 
-\* Con los archivos del reto y fecha de corte 21/11/2026.
+\* Con los archivos del reto y fecha de corte 23/11/2026.
 
 **Decisiones del modelo:**
 
@@ -823,7 +826,7 @@ Tablas de apoyo sin relaciones: `reporte_calidad` (hallazgos de la limpieza), `d
 - **`dim_empresa` incluye a los no afiliados** (`en_crm = 0`, 798 empresas). Son las que aparecen en asistencia o encuestas sin registro en el CRM y permiten medir los *asistentes no afiliados*.
 - **Una empresa, un registro principal.** Cuando el CRM tiene varios registros de la misma empresa, `dim_empresa` toma el vigente o el más reciente. Todos los registros quedan en `fact_membresia`.
 - **Las encuestas pueden no tener empresa ni evento.** `empresa_id` y `evento_id` aceptan nulos. `tipo_cruce` indica qué tan confiable es la empresa asignada (Exacto, Aproximado, Sin coincidencia, Sin empresa). `evento_inferencia` dice si el evento se asignó por fecha.
-- **Integridad garantizada por la base:** 9 llaves primarias, 11 llaves foráneas y 1 restricción `UNIQUE`. Si una fila no cumple, la carga se revierte completa.
+- **Integridad garantizada por la base:** 12 llaves primarias, 14 llaves foráneas y 1 restricción `UNIQUE`. Si una fila no cumple, la carga se revierte completa.
 - **Autodocumentada:** cada columna lleva su descripción del diccionario como comentario (`COMMENT ON COLUMN`), visible en DBeaver o pgAdmin.
 - **Índices** en las columnas que más se filtran: `empresa_id`, `evento_id`, `persona_id`, `estado_membresia` y `ejecutiva_id`.
 
@@ -847,6 +850,13 @@ Todas están definidas en `sql/vistas_dashboard.sql` y usan la fecha de corte y 
 | `v_temas_solicitados` | Temas pedidos para próximos espacios |
 | `v_relacion_participacion_renovacion` | Vista integrada: % vigentes y satisfacción según nivel de participación |
 | `v_no_afiliados_potenciales` | Empresas que participan sin membresía vigente |
+| `v_uso_beneficio_detalle` / `v_empresa_beneficios` | Uso de beneficios fila a fila y por empresa (usos en la ventana y en 12 meses, servicios, fuentes) |
+| `v_empresa_aprovechamiento` | Servicios incluidos en el nivel 2027 que ya se pueden medir y cuántos usó cada empresa |
+| `v_nps_actho` / `v_encuesta_relacion_detalle` | NPS de ACTHO, intención de renovar, bienvenida y ejecutiva (encuesta de 90 días, sin pruebas) |
+| `v_encuesta_90d_por_enviar` | Afiliados que cumplen 90 días o a los que les faltan ~60 para renovar, sin respuesta reciente |
+| `definicion_indicador` (tabla) | Definición, cálculo, fuente y estado (Propuesta / Acordada) de cada indicador; alimenta los íconos de ayuda |
+| `v_conciliacion_activos` / `v_conciliacion_detalle` | Por qué Zoho cuenta 481 «Activo» y el tablero 433 activos / 474 vigentes |
+| `historial.v_renovacion_medida` | Renovó / No renovó / Pendiente por empresa, comparando fotos mensuales consecutivas |
 | `v_segmentos_comunicacion` / `v_segmentos_resumen` | Los 7 segmentos de comunicaciones del reto, con la columna `autoriza_datos` para exportar solo personas autorizadas |
 | `v_asistencia_detalle` / `v_encuesta_detalle` | Detalle fila a fila con los atributos de empresa y evento |
 | `v_empresa_actividad` / `v_empresa_satisfaccion` | Métricas intermedias por empresa |
@@ -873,24 +883,26 @@ Solo se evalúan las membresías vigentes (Activo, Pronto a expirar, Periodo de 
 | | Vence en 0-30 días | 3 |
 | | Vence en 31-60 días | 2 |
 | | Vence en 61-90 días | 1 |
-| Participación | Sin asistencias en los últimos 90 días | 2 |
-| | … y tampoco en los últimos 12 meses | +1 |
+| Participación | Sin **uso de beneficios** en los últimos 90 días (asistencia, encuesta de 90 días o plantilla mensual) | 2 |
+| | … y tampoco en los últimos 12 meses (aquí también cuenta estar vinculado a una comunidad) | +1 |
 | Satisfacción | Detractor reciente (NPS 0-6 o nota ≤ 3 en los últimos 180 días) | 3 |
 | | Satisfacción promedio menor a 4,0 (últimos 12 meses) | 2 |
 
-**Rojo** con 5 puntos o más, **Amarillo** con 3 o 4, **Verde** con menos de 3. Las ventanas, los puntos y los umbrales están en `actho.config_parametro`. Cada empresa trae el texto `motivos_riesgo`, por ejemplo: *"Membresía vencida · Sin participación en 12 meses"*.
+**Rojo** (riesgo alto) con 5 puntos o más, **Amarillo** (medio) con 3 o 4, **Verde** (bajo) con menos de 3. La participación mide el **uso de beneficios**, no solo la asistencia: la oferta 2027 promete valor aunque el afiliado no asista. Las ventanas, los puntos y los umbrales están en `actho.config_parametro`. Cada empresa trae el texto `motivos_riesgo`, por ejemplo: *"Membresía vencida · Sin participación en 12 meses"*.
 
 > Diferencia con la sección 5.2: la versión objetivo usa una escala de 0 a 100 y un componente adicional de amplitud (personas distintas). La versión actual usa una escala corta (0 a 9) y tres componentes, porque es más fácil de explicar y validar con ACTHO. El cambio de escala solo implica ajustar los parámetros.
 
-### 7.6 Resultados con los datos del reto (corte 21/11/2026)
+### 7.6 Resultados con los datos del reto (corte 23/11/2026)
 
 | Indicador | Valor |
 | --- | ---: |
 | Afiliados activos / vigentes | 433 / 474 |
 | Vencen en los próximos 60 días (259 el 31/12/2026) | 261 |
 | Vigentes vencidas sin renovar (periodo de gracia) | 41 |
-| Vigentes que asistieron en los últimos 90 días | 27,8 % |
-| Semáforo rojo / amarillo / verde | 84 / 194 / 196 |
+| Vigentes que usaron algún beneficio en los últimos 90 días | 27,8 % |
+| Vigentes con algún uso en 12 meses (incluye comunidades) | 422 |
+| Aprovechamiento promedio del nivel | 33 % |
+| Semáforo alto / medio / bajo | 61 / 197 / 216 |
 | Tasa de renovación (aproximada) | 74,6 % |
 | Empresas / personas que asisten sin estar afiliadas | 825 / 1.172 |
 | Satisfacción promedio (1-5) | 4,79 |
@@ -899,7 +911,9 @@ Solo se evalúan las membresías vigentes (Activo, Pronto a expirar, Periodo de 
 **Límites conocidos:**
 
 - **Tasa de renovación aproximada.** Zoho sobrescribe la fecha de expiración al renovar y no guarda historial. Se cuentan como renovados los vigentes con más de un año de afiliación, y como no renovados los cancelados o expirados cuya expiración cayó en los últimos 12 meses. Desde ahora el DAG diario guarda una foto mensual (`historial.snapshot_membresia`), y `historial.v_movimientos_mensuales` mide las renovaciones reales a partir del segundo mes.
-- **NPS de eventos con pocas respuestas** (41). El NPS de ACTHO (encuesta de 90 días) queda conectado pero vacío.
+- **NPS de eventos con pocas respuestas** (41). El NPS de ACTHO (encuesta de 90 días) queda conectado pero vacío: el archivo del reto trae el instrumento sin respuestas. La carga se probó con respuestas de ensayo.
+- **Uso de beneficios digitales:** boletín, GetAbstract, Presencia, podcast, Sello y Centro de Experiencias no dejan registro. Se suman con la plantilla mensual (`Datos/8. Uso de beneficios/uso_beneficios.xlsx`, descargable en Datos y calidad) y con la pregunta 3.1 de la encuesta de 90 días.
+- **Conciliación con Zoho:** los 481 registros «Activo» de Zoho son 432 activos, 33 en periodo de gracia, 8 pronto a expirar y **8 con la membresía expirada** (error de captura a corregir en el CRM).
 - **Detractores:** hoy no hay ninguno en los datos (la nota más baja es 8 en NPS y 3,25 en satisfacción), así que ese segmento aparece vacío.
 - **Evento de cada encuesta:** se infiere por fecha y modalidad. Se asignaron 304 de 778 respuestas. Las de 2025 no corresponden a eventos de 2026 y algunas fechas tienen dos eventos.
 - **`afiliado_segun_hoja`:** la primera columna de las hojas de asistencia usa los códigos 1 y 2. Los datos sugieren 1 = afiliado y 2 = no afiliado (90 % frente a 14 % de empresas vigentes), pero falta confirmarlo con ACTHO.
@@ -957,7 +971,7 @@ Usuario inicial del tablero: **admin** / **actho**. Hay que cambiarlo antes de c
 | `src/ingesta_control.py` | Huellas, detección de cambios, validación, verificación, recálculo e historial |
 | `sql/control.sql` | Esquemas persistentes `ingesta` e `historial` |
 | `pipelines/airflow/dags/` | DAG `actho_ingesta_datos` y `actho_recalculo_riesgo_diario` (ver 7.9) |
-| `frontend/tablero/` | Tablero Streamlit: `Inicio.py` (navegación), `login.py` y `auth.py` (acceso), `comun.py` (datos, estilo y filtros), `paginas/` (8 pantallas) (ver 7.10) |
+| `frontend/tablero/` | Tablero Streamlit: `Inicio.py` (navegación), `login.py` y `auth.py` (acceso), `comun.py` (datos, estilo, filtros y filtro cruzado), `graficas.py` (constructor de gráficas), `extracto.py` (extracto de valor), `powerbi.py` (paquete de Power BI), `paginas/` (9 pantallas) (ver 7.10) |
 | `.streamlit/config.toml` | Tema del tablero con los colores de ACTHO y la fuente Poppins |
 
 `Datos/`, `salida/`, `.env`, `.pgdata/`, `.postgres/` y cualquier `.xlsx`, `.csv` o `.pdf` están en `.gitignore`: los datos del reto nunca se suben al repositorio.
@@ -985,7 +999,7 @@ flowchart LR
 
 | Tarea | Qué hace |
 | --- | --- |
-| `verificar_fuentes` | Comprueba que estén los 6 archivos de `Datos/` y calcula su huella SHA-256 |
+| `verificar_fuentes` | Comprueba que estén los 6 archivos obligatorios de `Datos/` (más la encuesta de 90 días y la plantilla de uso si existen) y calcula su huella SHA-256 |
 | `detectar_cambios` | Compara las huellas con la última carga (`ingesta.lote_carga`). Si nada cambió, termina sin procesar (*short-circuit*) |
 | `iniciar_ejecucion` | Abre el registro en `ingesta.ejecucion` con la fecha de corte y las fuentes que cambiaron |
 | `limpiar_datos` | Ejecuta `src/limpieza_datos.py` |
@@ -1070,14 +1084,15 @@ Los componentes están en `comun.py` (`encabezado`, `kpi`, `meta`, `cabeza`, `ta
 
 | Página | Wireframe | Para quién | Contenido |
 | --- | --- | --- | --- |
-| Panel general | 01 | Dirección y Junta | Avance a las metas 2027 (renovación 90 %, NPS +55), activos, vencimientos a 90 días, participación, satisfacción, semáforo, vencimientos de 12 meses, inscripciones por mes, vigentes por nivel y lecturas de Pulso |
+| Panel general | 01 | Dirección y Junta | Metas 2027 (renovación medida o aproximada, NPS de eventos y NPS de ACTHO), activos, vencimientos, uso de beneficios, satisfacción, semáforo, uso por servicio, vigentes por nivel, **constructor de gráficas** y botón **Ver en Power BI** |
+| Base de afiliados | 09 | Dirección y Comercial | Altas, retiros y neto acumulado de 24 meses; composición por tipo, tamaño, sector y ciudad; tabla nivel × tipo y exportación |
 | Afiliados | 02 | Comercial | Directorio filtrable y ordenado por riesgo; vista rápida y acceso a la ficha; exportación CSV |
-| Ficha 360° | 03 | Ejecutivas | Índice de salud, componentes del riesgo, vencimiento, historial de participación, personas, encuestas y acciones sugeridas |
-| Renovación y retención | 04 | Comercial y Dirección | Calendario de renovaciones a 30, 60 y 90 días, mapa de vencimientos por ejecutiva y mes, retención por antigüedad y por participación, y seguimiento por ejecutiva |
-| Experiencias y NPS | 05 | Experiencias | Participación por línea, modalidad y cargo; tabla de eventos con satisfacción y NPS; satisfacción por aspecto, distribución del NPS, temas pedidos y comentarios |
+| Ficha 360° | 03 | Ejecutivas | Índice de salud, componentes del riesgo, **valor recibido del nivel** (beneficios usados, disponibles y sin registro), historial, personas, encuestas, acciones sugeridas y **extracto de valor** descargable |
+| Renovación y retención | 04 | Comercial y Dirección | Calendario de renovaciones a 30, 60 y 90 días, **extractos de valor en ZIP** para la campaña, tasa de renovación filtrable, mapa de vencimientos por ejecutiva y mes, retención y seguimiento por ejecutiva |
+| Experiencias y NPS | 05 | Experiencias | Participación por línea, modalidad y cargo; tabla de eventos; satisfacción por aspecto; distribución del NPS; **NPS de ACTHO** (encuesta de 90 días, intención de renovar, lista por encuestar); temas pedidos y comentarios |
 | Pulso | 06 | Dirección | Alertas y nuevos rojos (desde `historial`), factores asociados a la retención y **simulador de criterios** del semáforo |
-| Segmentos | — | Comunicaciones | Los 7 segmentos del reto con personas contactables (Ley 1581) y exportación |
-| Datos y calidad | 07 | Datos | Cargas de Airflow, diagnóstico de calidad, completitud del CRM, diccionario y recomendaciones de captura |
+| Segmentos | — | Comunicaciones | Los segmentos del reto más «Encuesta de 90 días por enviar», con personas contactables (Ley 1581) y exportación |
+| Datos y calidad | 07 | Datos | Cargas de Airflow, diagnóstico de calidad, completitud del CRM, **definiciones de los indicadores** para acordar con ACTHO, **conciliación con Zoho**, **cobertura del uso de beneficios** y plantilla mensual, diccionario y recomendaciones de captura |
 
 **Filtros globales** (barra blanca sobre el contenido, se mantienen al cambiar de página): periodo, nivel 2027, tipo de afiliado, sector, ciudad y ejecutiva, como pide el reto. No aparecen en Ficha 360° ni en Datos y calidad.
 
@@ -1096,6 +1111,12 @@ docker compose up -d postgres tablero
 ```
 
 **Pruebas realizadas:** el login y las páginas visibles se auditaron en Chrome (Playwright) a 1280 y 1500 px, sin elementos sobrepuestos, sin componentes del mismo tipo con distinto tamaño y sin texto desbordado. Antes, las 8 páginas se recorrieron con Chrome (Playwright) en **Streamlit 1.50** (Python 3.9+) y **1.67**, sin errores ni avisos. También se probó la navegación del directorio a la ficha 360° y el simulador. Con los parámetros vigentes, el simulador reproduce exactamente el semáforo calculado en PostgreSQL (0 diferencias).
+
+**Constructor de gráficas (Dashboard).** Cada persona arma sus propias consultas sin programar: elige los datos (empresas vigentes, empresas del CRM, asistencias, encuestas o uso de beneficios), la dimensión, un desglose opcional, la medida y el tipo de gráfico. Respetan los filtros, filtran el tablero con un clic y se pueden guardar y cargar como archivo (`graficas.py`).
+
+**Ver en Power BI (Dashboard).** Descarga `ACTHO_PowerBI.zip` con un Power BI Project (PBIP): modelo semántico en TMDL (tablas Empresas, Asistencia, Encuestas y Beneficios, relaciones por empresa y las medidas del tablero con las mismas definiciones), informe en formato PBIR con las páginas *Dashboard* y *Renovaciones* y el tema de ACTHO, los datos en CSV y un `LEEME.txt`. Se descomprime en `C:\` y se abre `ACTHO_Dashboard.pbip` con Power BI Desktop (solo Windows). Los archivos del informe se validaron contra los esquemas JSON oficiales de Microsoft (`microsoft/json-schemas`); el modelo sigue la estructura de los proyectos que guarda Power BI Desktop. También se puede generar por consola: `python frontend/tablero/powerbi.py --salida powerbi/` (`powerbi.py`).
+
+**Extracto de valor.** Página HTML autocontenida por afiliado (se imprime o guarda como PDF) con lo que usó en 12 meses, las experiencias de su equipo, los beneficios de su nivel usados y pendientes, su voz en las encuestas y sugerencias. No incluye datos personales (`extracto.py`).
 
 **Pendiente:** consultas en lenguaje natural con IA (wireframe 06). El tablero deja el espacio señalado; el asistente solo podrá leer las vistas, con datos seudonimizados.
 

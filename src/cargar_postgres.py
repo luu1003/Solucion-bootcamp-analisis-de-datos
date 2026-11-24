@@ -40,22 +40,31 @@ TABLAS = {
     "dim_empresa": {"pk": ["empresa_id"], "fk": {"ejecutiva_id": "dim_ejecutiva"}},
     "dim_persona": {"pk": ["persona_id"], "fk": {"empresa_id": "dim_empresa"}},
     "dim_evento": {"pk": ["evento_id"]},
+    "dim_servicio": {"pk": ["servicio_id"]},
     "fact_membresia": {"pk": ["registro_id"], "fk": {"empresa_id": "dim_empresa", "ejecutiva_id": "dim_ejecutiva"}},
     "fact_asistencia": {"pk": ["asistencia_id"],
                         "fk": {"empresa_id": "dim_empresa", "persona_id": "dim_persona", "evento_id": "dim_evento"}},
     "fact_encuesta_evento": {"pk": ["encuesta_id"], "unique": ["respuesta_id"],
                              "fk": {"empresa_id": "dim_empresa", "persona_id": "dim_persona", "evento_id": "dim_evento"}},
     "fact_encuesta_temas": {"pk": None, "fk": {"encuesta_id": "fact_encuesta_evento"}},
+    "fact_uso_beneficio": {"pk": ["uso_id"], "fk": {"empresa_id": "dim_empresa", "servicio_id": "dim_servicio"}},
+    "fact_encuesta_relacion": {"pk": ["respuesta_id"], "fk": {"empresa_id": "dim_empresa"}},
     "reporte_calidad": {"pk": None},
     "diccionario_datos": {"pk": None},
 }
 FK_DESTINO = {"dim_ejecutiva": "ejecutiva_id", "dim_empresa": "empresa_id", "dim_persona": "persona_id",
-              "dim_evento": "evento_id", "fact_encuesta_evento": "encuesta_id"}
+              "dim_evento": "evento_id", "fact_encuesta_evento": "encuesta_id", "dim_servicio": "servicio_id"}
 COLS_FECHA = {"fecha", "fecha_fin", "fecha_afiliacion", "fecha_expiracion", "miembro_desde"}
 COLS_FECHA_HORA = {"fecha_respuesta"}
 INDICES = [("fact_asistencia", "empresa_id"), ("fact_asistencia", "evento_id"), ("fact_asistencia", "persona_id"),
            ("fact_encuesta_evento", "empresa_id"), ("fact_encuesta_evento", "evento_id"),
-           ("fact_membresia", "empresa_id"), ("dim_empresa", "estado_membresia"), ("dim_empresa", "ejecutiva_id")]
+           ("fact_membresia", "empresa_id"), ("dim_empresa", "estado_membresia"), ("dim_empresa", "ejecutiva_id"),
+           ("fact_uso_beneficio", "empresa_id"), ("fact_uso_beneficio", "servicio_id")]
+# Tipos fijos para tablas que pueden llegar vacías (p. ej. la encuesta de 90 días antes de tener respuestas).
+TIPOS_FORZADOS = {"nps_actho": "integer", "cumplimiento_expectativas": "numeric(10,2)", "calif_bienvenida": "numeric(10,2)",
+                  "calif_ejecutiva": "numeric(10,2)", "intencion_renovar": "numeric(10,2)", "es_prueba": "integer",
+                  "es_fechado": "integer", "cantidad": "integer", "medible": "integer",
+                  "incluido_conectar": "integer", "incluido_crecer": "integer", "incluido_liderar": "integer"}
 
 
 def leer_env():
@@ -92,6 +101,8 @@ def leer_tabla(nombre):
             df[c] = pd.to_datetime(df[c], errors="coerce").dt.date
         elif c in COLS_FECHA_HORA:
             df[c] = pd.to_datetime(df[c], errors="coerce")
+        elif TIPOS_FORZADOS.get(c) == "integer":
+            df[c] = pd.to_numeric(df[c], errors="coerce").round().astype("Int64")
         elif pd.api.types.is_float_dtype(df[c]) and df[c].dropna().apply(float.is_integer).all() and \
                 (c.endswith("_id") or c in {"anio", "mes", "nps_puntaje", "dias_a_vencer", "cantidad_miembros"}):
             df[c] = df[c].astype("Int64")
@@ -99,6 +110,8 @@ def leer_tabla(nombre):
 
 
 def tipo_sql(serie, col):
+    if col in TIPOS_FORZADOS:
+        return TIPOS_FORZADOS[col]
     if col in COLS_FECHA:
         return "date"
     if col in COLS_FECHA_HORA:

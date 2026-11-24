@@ -42,7 +42,7 @@ services:
       # Proyecto montado dentro del contenedor
       ACTHO_RAIZ: /opt/actho
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/actho
-      _PIP_ADDITIONAL_REQUIREMENTS: "pandas>=2.0 numpy>=1.24 openpyxl>=3.1 psycopg[binary]>=3.1"
+      _PIP_ADDITIONAL_REQUIREMENTS: "pandas>=2.0 numpy>=1.24 openpyxl>=3.1 psycopg[binary]>=3.1 scikit-learn>=1.3 statsmodels>=0.14"
       # Airflow
       AIRFLOW__CORE__DAGS_FOLDER: /opt/actho/pipelines/airflow/dags
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"

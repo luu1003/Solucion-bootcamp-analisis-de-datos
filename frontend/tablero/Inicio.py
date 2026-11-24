@@ -35,6 +35,7 @@ SECCIONES = {
         ("06_pulso.py", "Pulso", ":material/monitor_heart:"),
     ],
     "Cartera": [
+        ("09_base_afiliados.py", "Base de afiliados", ":material/monitoring:"),
         ("02_afiliados.py", "Afiliados", ":material/groups:"),
         ("03_ficha_360.py", "Ficha 360°", ":material/badge:"),
         ("04_renovacion.py", "Renovación y retención", ":material/autorenew:"),

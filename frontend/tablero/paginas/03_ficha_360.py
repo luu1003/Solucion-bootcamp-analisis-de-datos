@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import comun as c
+import extracto
 
 todas = c.empresas()
 crm = todas[todas["en_crm"] == 1].sort_values(["es_vigente", "puntaje_riesgo"], ascending=[False, False])
@@ -26,6 +27,9 @@ enc_e = enc[enc["empresa_id"] == emp_id]
 personas = c.consulta("SELECT persona_id, nivel_cargo, autoriza_datos, inscripciones_2026, es_contacto_principal "
                       "FROM actho.dim_persona WHERE empresa_id = %s ORDER BY inscripciones_2026 DESC", (emp_id,))
 
+uso = c.uso_beneficios()
+uso_e = uso[uso["empresa_id"] == emp_id]
+cat = c.catalogo()
 vigente = emp["es_vigente"] == 1
 salud = round(100 - 100 * (emp["puntaje_riesgo"] or 0) / 9) if vigente else None
 
@@ -46,8 +50,10 @@ if pd.notna(emp["dias_a_vencer"]):
 else:
     nota_vence = emp["rango_vencimiento"]
 c.kpi(k[1], "Vence", c.fecha_txt(emp["fecha_expiracion"]), nota_vence)
-c.kpi(k[2], "Asistencias 12 meses", c.fmt(emp["inscripciones_12m"]),
-      f"{c.fmt(emp['inscripciones_ventana'])} en los últimos {p['ventana_participacion_dias']} días")
+c.kpi(k[2], "Beneficios usados", c.fmt(emp["servicios_12m"]),
+      (f"{c.fmt(emp['servicios_incluidos_usados'])} de {c.fmt(emp['servicios_incluidos_medibles'])} incluidos en su nivel · "
+       if pd.notna(emp["servicios_incluidos_medibles"]) else "") + f"{c.fmt(emp['inscripciones_12m'])} asistencias en 12 meses",
+      ayuda_=c.ayuda("Aprovechamiento del nivel"))
 c.kpi(k[3], "Personas que participan", c.fmt(emp["personas_distintas"]), f"{c.fmt(emp['lineas_distintas'])} líneas usadas")
 prom_general = enc["satisfaccion_general"].fillna(enc["satisfaccion_prom"]).mean()
 c.kpi(k[4], "Satisfacción", c.fmt(emp["satisfaccion_promedio"], 2), f"Promedio general {c.fmt(prom_general, 2)}")
@@ -83,6 +89,32 @@ with izq:
             else:
                 c.cabeza("Participación en experiencias", "Inscripciones por mes y línea 2027")
                 st.info("Esta empresa no registra asistencias a eventos de 2026.")
+
+    with c.tarjeta():
+        nivel = emp["nivel_2027"]
+        c.cabeza(f"Valor recibido · nivel {nivel}", "Beneficios incluidos en su afiliación y si los usó en los últimos 12 meses")
+        col_inc = {"Conectar": "incluido_conectar", "Crecer": "incluido_crecer", "Liderar": "incluido_liderar"}.get(nivel)
+        if col_inc and len(cat):
+            corte_ = pd.Timestamp(p["fecha_corte"])
+            u12 = uso_e[(uso_e["es_fechado"] == 0) | (pd.to_datetime(uso_e["fecha"]) > corte_ - pd.Timedelta(days=365))]
+            usados = u12.groupby("servicio_id").agg(usos=("cantidad", "sum"), ultimo=("fecha", "max"),
+                                                    fuente=("fuente", "first"))
+            medibles = set(cat[cat["fuente_dato"].isin(["Asistencia", "CRM y asistencia"])]["servicio_id"]) | set(uso["servicio_id"])
+            filas = []
+            for r_ in cat[cat[col_inc] == 1].itertuples():
+                if r_.servicio_id in usados.index:
+                    u_ = usados.loc[r_.servicio_id]
+                    estado = c.chip("Usado", "OK")
+                    det = f"{c.fmt(u_['usos'])} usos · " + ("vinculación vigente" if str(u_["fuente"]).startswith("CRM")
+                                                           else f"último {c.fecha_txt(u_['ultimo'])}")
+                elif r_.servicio_id in medibles:
+                    estado, det = c.chip("Disponible, sin usar", "Riesgo"), "Proponerlo en la próxima conversación"
+                else:
+                    estado, det = c.chip("Sin registro aún", "Neutro"), "ACTHO todavía no registra su uso"
+                filas.append({"s": r_.servicio, "l": r_.linea_servicio, "e": estado, "d": det})
+            c.tabla_html(filas, [("Beneficio", ("s", "l"), "texto"), ("Estado", "e", "html"), ("Detalle", "d", "texto")])
+        else:
+            st.caption("Esta afiliación no está en un nivel 2027 (persona natural o no afiliada).")
 
     with c.tarjeta():
         c.cabeza("Historial de participación")
@@ -153,5 +185,11 @@ with der, c.panel():
     if not acciones:
         acciones.append("<b>Sin alertas</b><br><span>Mantener el contacto regular y compartir la agenda.</span>")
     c.pulso(acciones, titulo="Acciones sugeridas", lema="Reglas de Pulso a partir de su ficha")
+    if vigente or emp["en_crm"] == 1:
+        enc_ext = enc_e.copy()
+        st.download_button("Descargar extracto de valor", extracto.html_extracto(emp, uso_e, asis_e, enc_ext, cat, p["fecha_corte"]).encode("utf-8"),
+                           file_name=f"extracto_valor_{emp_id}.html", mime="text/html", type="primary",
+                           icon=":material/description:", key="ficha_extracto", **c.ancho(st.download_button),
+                           help="Página lista para imprimir o guardar como PDF con lo que la empresa usó en el año")
     if isinstance(emp.get("inconsistencia"), str) and emp["inconsistencia"]:
         st.warning(f"Dato por revisar en el CRM: {emp['inconsistencia']}")

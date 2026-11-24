@@ -109,6 +109,66 @@ with izq:
             c.grafico(fig, 270, f"{c.fmt(r4['nps_puntaje'].notna().sum())} respuestas · promotores 9-10, pasivos 7-8, "
                       "detractores 0-6 · clic para filtrar", dims=["nps_categoria"], clave="nps")
 
+    # NPS de ACTHO: encuesta de relación a 90 días (meta central 2027)
+    with c.tarjeta():
+        c.cabeza("NPS de ACTHO · encuesta de relación a 90 días",
+                 "Mide la relación con la asociación y la intención de renovar, no un evento")
+        rel = c.relacion()
+        if len(rel):
+            rel = rel[pd.to_datetime(rel["fecha"]).between(*c.periodo())] if c.periodo()[0] is not None else rel
+            if c.hay_filtros_empresa():
+                rel = rel[rel["empresa_id"].isin(set(c.filtrar_empresas(c.empresas())["empresa_id"]))]
+        pe = c.tabla("v_encuesta_90d_por_enviar") if c.existe("actho.v_encuesta_90d_por_enviar") else pd.DataFrame()
+        n = rel["nps_actho"].notna().sum() if len(rel) else 0
+        nps_a = 100 * ((rel["nps_categoria"] == "Promotor").sum() - (rel["nps_categoria"] == "Detractor").sum()) / n if n else None
+        kk = c.fila(4)
+        c.kpi(kk[0], "NPS de ACTHO", (("+" if (nps_a or 0) > 0 else "") + c.fmt(nps_a, 0)) if n else "—",
+              f"{c.fmt(n)} respuestas" if n else "Aún sin respuestas", oscuro=True,
+              chip_=("Morado", "Meta 2027: +55"), ayuda_=c.ayuda("NPS de ACTHO"))
+        c.kpi(kk[1], "Intención de renovar", c.fmt(100 * (rel["intencion_renovar"] >= 4).mean(), 0, " %") if n else "—",
+              "Responden 4 o 5 de 5", ayuda_=c.ayuda("Intención de renovar"))
+        c.kpi(kk[2], "Bienvenida y ejecutiva", f"{c.fmt(rel['calif_bienvenida'].mean(), 1)} · {c.fmt(rel['calif_ejecutiva'].mean(), 1)}" if n else "—",
+              "Promedio 1-5 de cada una")
+        c.kpi(kk[3], "Por encuestar", c.fmt(len(pe)), "Cumplen 90 días o renuevan en ~60 días",
+              chip_=("Alerta" if len(pe) else "OK", "Enviar desde Segmentos" if len(pe) else "Al día"))
+        if n:
+            g1_, g2_ = st.columns(2)
+            with g1_:
+                cat_ = rel["nps_categoria"].value_counts().reindex(["Detractor", "Pasivo", "Promotor"]).fillna(0).reset_index()
+                cat_.columns = ["Categoría", "Respuestas"]
+                fig = px.bar(cat_, x="Categoría", y="Respuestas", color="Categoría", color_discrete_map=c.NPS_COLOR,
+                             title="Promotores, pasivos y detractores", text="Respuestas")
+                fig.update_traces(textposition="outside", cliponaxis=False)
+                fig.update_layout(showlegend=False)
+                fig.update_xaxes(title="")
+                fig.update_yaxes(title="", tickformat="d", rangemode="tozero", dtick=max(1, int(cat_["Respuestas"].max() // 5)))
+                c.grafico(fig, 240)
+            with g2_:
+                ben = rel["beneficios_usados"].dropna().str.split("; ").explode().value_counts().reset_index()
+                ben.columns = ["Beneficio", "Respuestas"]
+                fig = px.bar(ben.sort_values("Respuestas"), x="Respuestas", y="Beneficio", orientation="h", text="Respuestas",
+                             title="Beneficios que dicen haber usado", color_discrete_sequence=[c.C["morado"]])
+                fig.update_traces(textposition="outside", cliponaxis=False, textfont=dict(color=c.C["tinta"]))
+                fig.update_xaxes(title="", showticklabels=False, showgrid=False, range=[0, ben["Respuestas"].max() * 1.25])
+                fig.update_yaxes(title="")
+                c.grafico(fig, 240)
+            razones = rel["razon_nps"].dropna().drop_duplicates()
+            for t in razones.head(3):
+                c.hallazgo(f"«{c._e(t[:160])}»")
+        else:
+            st.markdown("El tablero ya está **listo para recibirla**: cuando ACTHO active la encuesta y deje la exportación en "
+                        "`Datos/3. Encuestas y NPS/`, este bloque mostrará el NPS de la asociación, la intención de renovar, "
+                        "la calificación de la bienvenida y de la ejecutiva, y los beneficios que cada afiliado dice usar "
+                        "(que también alimentan el indicador de uso de beneficios).")
+        if len(pe):
+            with st.expander(f"Empresas por encuestar ({c.fmt(len(pe))})", icon=":material/outgoing_mail:"):
+                c.tabla_df(pe[["empresa_id", "ejecutiva", "nivel_2027", "motivo", "fecha_afiliacion", "dias_a_vencer"]], height=260,
+                           column_config={"empresa_id": "Empresa", "ejecutiva": "Ejecutiva", "nivel_2027": "Nivel",
+                                          "motivo": "Por qué ahora",
+                                          "fecha_afiliacion": st.column_config.DateColumn("Afiliada", format="DD/MM/YYYY"),
+                                          "dias_a_vencer": st.column_config.NumberColumn("Días a vencer", format="%d")})
+                c.descargar(pe, "encuesta_90_dias_por_enviar.csv", "Exportar lista")
+
 with der, c.panel():
     temas = c.tabla("v_temas_solicitados")
     temas["tema_completo"] = temas["tema"]

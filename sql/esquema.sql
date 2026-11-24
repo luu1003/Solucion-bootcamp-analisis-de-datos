@@ -70,6 +70,7 @@ CREATE TABLE actho.dim_empresa (
     "n_comunidades" integer,
     "cantidad_miembros_atipico" integer,
     "es_persona_natural" integer,
+    "estado_crm" text,
     "n_registros_crm" integer,
     "en_crm" integer,
     "origen" text,
@@ -116,6 +117,7 @@ COMMENT ON COLUMN actho.dim_empresa."rango_vencimiento" IS 'Vencida, 0-30, 31-60
 COMMENT ON COLUMN actho.dim_empresa."n_comunidades" IS 'Número de comunidades temáticas a las que pertenece.';
 COMMENT ON COLUMN actho.dim_empresa."cantidad_miembros_atipico" IS '1 si el valor es extremo según el rango intercuartílico.';
 COMMENT ON COLUMN actho.dim_empresa."es_persona_natural" IS '1 si la membresía es de persona natural.';
+COMMENT ON COLUMN actho.dim_empresa."estado_crm" IS 'Campo ''Estado'' de Zoho (Activo/Inactivo). Es el que cuentan los informes de Zoho; se conserva para conciliar.';
 COMMENT ON COLUMN actho.dim_empresa."n_registros_crm" IS 'Número de registros de la empresa en el CRM.';
 COMMENT ON COLUMN actho.dim_empresa."en_crm" IS '1 si la empresa tiene registro en el CRM.';
 COMMENT ON COLUMN actho.dim_empresa."origen" IS 'De dónde viene la empresa (CRM, Asistencia, Encuesta, Base de afiliados).';
@@ -168,6 +170,33 @@ COMMENT ON COLUMN actho.dim_evento."mes" IS 'Mes (número).';
 COMMENT ON COLUMN actho.dim_evento."inscritos" IS 'Personas inscritas al evento (sin duplicados).';
 COMMENT ON COLUMN actho.dim_evento."empresas_distintas" IS 'Empresas distintas con al menos una inscripción al evento.';
 
+CREATE TABLE actho.dim_servicio (
+    "servicio_id" text NOT NULL,
+    "servicio" text,
+    "linea_servicio" text,
+    "descripcion" text,
+    "incluido_conectar" integer,
+    "incluido_crecer" integer,
+    "incluido_liderar" integer,
+    "condicion" text,
+    "fuente_dato" text,
+    "opcion_encuesta_90d" text,
+    "medible" integer,
+    PRIMARY KEY (servicio_id)
+);
+
+COMMENT ON COLUMN actho.dim_servicio."servicio_id" IS 'Código del servicio de la oferta 2027 (S01-S17; S99 = otro autodeclarado).';
+COMMENT ON COLUMN actho.dim_servicio."servicio" IS 'Nombre del servicio de la oferta 2027.';
+COMMENT ON COLUMN actho.dim_servicio."linea_servicio" IS 'Línea de la oferta 2027 del servicio (Anticipar, Saber, Pares, Proyectar, Acompañar, Transversal).';
+COMMENT ON COLUMN actho.dim_servicio."descripcion" IS 'Descripción del servicio.';
+COMMENT ON COLUMN actho.dim_servicio."incluido_conectar" IS '1 si el servicio viene incluido en el nivel Conectar.';
+COMMENT ON COLUMN actho.dim_servicio."incluido_crecer" IS '1 si el servicio viene incluido en el nivel Crecer.';
+COMMENT ON COLUMN actho.dim_servicio."incluido_liderar" IS '1 si el servicio viene incluido en el nivel Liderar.';
+COMMENT ON COLUMN actho.dim_servicio."condicion" IS 'Condiciones del servicio según el nivel (documento de equivalencias).';
+COMMENT ON COLUMN actho.dim_servicio."fuente_dato" IS 'Dónde queda registro del uso hoy (Asistencia, CRM, Plantilla mensual, Encuesta 90 días o Sin registro).';
+COMMENT ON COLUMN actho.dim_servicio."opcion_encuesta_90d" IS 'Opción de la pregunta 3.1 de la encuesta de 90 días que corresponde al servicio.';
+COMMENT ON COLUMN actho.dim_servicio."medible" IS '1 si hoy existe alguna fuente para medir el uso del servicio.';
+
 CREATE TABLE actho.fact_membresia (
     "registro_id" text NOT NULL,
     "empresa_id" text,
@@ -176,6 +205,7 @@ CREATE TABLE actho.fact_membresia (
     "categoria_membresia" text,
     "nivel_2027" text,
     "estado_membresia" text,
+    "estado_crm" text,
     "es_activo" integer,
     "es_vigente" integer,
     "fecha_afiliacion" date,
@@ -197,6 +227,7 @@ COMMENT ON COLUMN actho.fact_membresia."tipo_membresia" IS 'Quién se afilia: Em
 COMMENT ON COLUMN actho.fact_membresia."categoria_membresia" IS 'Categoría en Zoho: Estándar, Premium, Elite o Personal.';
 COMMENT ON COLUMN actho.fact_membresia."nivel_2027" IS 'Nivel de la oferta 2027 equivalente: Conectar (Estándar), Crecer (Premium), Liderar (Elite).';
 COMMENT ON COLUMN actho.fact_membresia."estado_membresia" IS 'Estado de la membresía (Activo, Periodo de gracia, Pronto a expirar, Expirado, Inactivo, Cancelado).';
+COMMENT ON COLUMN actho.fact_membresia."estado_crm" IS 'Campo ''Estado'' de Zoho (Activo/Inactivo). Es el que cuentan los informes de Zoho; se conserva para conciliar.';
 COMMENT ON COLUMN actho.fact_membresia."es_activo" IS '1 si el estado de la membresía es ''Activo'' (definición del indicador ''Afiliados activos'').';
 COMMENT ON COLUMN actho.fact_membresia."es_vigente" IS '1 si es Activo, Periodo de gracia o Pronto a expirar.';
 COMMENT ON COLUMN actho.fact_membresia."fecha_afiliacion" IS 'Fecha de afiliación (vacía si venía vacía o era imposible).';
@@ -329,6 +360,83 @@ COMMENT ON COLUMN actho.fact_encuesta_temas."respuesta_id" IS 'ID de respuesta d
 COMMENT ON COLUMN actho.fact_encuesta_temas."tema" IS 'Tema solicitado para próximos espacios.';
 COMMENT ON COLUMN actho.fact_encuesta_temas."detalle" IS 'Detalle cuando el tema es ''Otro''.';
 
+CREATE TABLE actho.fact_uso_beneficio (
+    "uso_id" integer NOT NULL,
+    "empresa_id" text,
+    "persona_id" text,
+    "servicio_id" text,
+    "fecha" date,
+    "cantidad" integer,
+    "fuente" text,
+    "detalle" text,
+    "es_fechado" integer,
+    PRIMARY KEY (uso_id),
+    FOREIGN KEY (empresa_id) REFERENCES actho.dim_empresa(empresa_id),
+    FOREIGN KEY (servicio_id) REFERENCES actho.dim_servicio(servicio_id)
+);
+
+COMMENT ON COLUMN actho.fact_uso_beneficio."uso_id" IS 'Consecutivo del uso de un beneficio.';
+COMMENT ON COLUMN actho.fact_uso_beneficio."empresa_id" IS 'Código anonimizado de la empresa (EMP-####). Llave común entre CRM, asistencia y encuestas.';
+COMMENT ON COLUMN actho.fact_uso_beneficio."persona_id" IS 'Código anonimizado de la persona (P-#####).';
+COMMENT ON COLUMN actho.fact_uso_beneficio."servicio_id" IS 'Código del servicio de la oferta 2027 (S01-S17; S99 = otro autodeclarado).';
+COMMENT ON COLUMN actho.fact_uso_beneficio."fecha" IS 'Fecha.';
+COMMENT ON COLUMN actho.fact_uso_beneficio."cantidad" IS 'Cantidad de usos (p. ej. personas vinculadas a una comunidad o aperturas del boletín).';
+COMMENT ON COLUMN actho.fact_uso_beneficio."fuente" IS 'Origen del registro de uso: Asistencia, CRM (comunidad vigente), Encuesta 90 días o Plantilla.';
+COMMENT ON COLUMN actho.fact_uso_beneficio."detalle" IS 'Detalle cuando el tema es ''Otro''.';
+COMMENT ON COLUMN actho.fact_uso_beneficio."es_fechado" IS '1 si el uso tiene fecha real (cuenta para la ventana de 90 días); 0 para estados vigentes como las comunidades.';
+
+CREATE TABLE actho.fact_encuesta_relacion (
+    "respuesta_id" text NOT NULL,
+    "fecha_respuesta" timestamp,
+    "persona_id" text,
+    "empresa_id" text,
+    "empresa_reportada" text,
+    "nivel_cargo" text,
+    "ciudad" text,
+    "nps_actho" integer,
+    "nps_categoria" text,
+    "razon_nps" text,
+    "motivo_afiliacion" text,
+    "cumplimiento_expectativas" numeric(10,2),
+    "beneficios_usados" text,
+    "beneficio_mas_valor" text,
+    "beneficio_desconocido" text,
+    "que_funciono" text,
+    "que_no_funciono" text,
+    "calif_bienvenida" numeric(10,2),
+    "calif_ejecutiva" numeric(10,2),
+    "intencion_renovar" numeric(10,2),
+    "quiere_contacto" text,
+    "acepta_tratamiento_datos" text,
+    "es_prueba" integer,
+    PRIMARY KEY (respuesta_id),
+    FOREIGN KEY (empresa_id) REFERENCES actho.dim_empresa(empresa_id)
+);
+
+COMMENT ON COLUMN actho.fact_encuesta_relacion."respuesta_id" IS 'ID de respuesta del formulario.';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."fecha_respuesta" IS 'Fecha y hora en que se completó la respuesta.';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."persona_id" IS 'Código anonimizado de la persona (P-#####).';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."empresa_id" IS 'Código anonimizado de la empresa (EMP-####). Llave común entre CRM, asistencia y encuestas.';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."empresa_reportada" IS 'Empresa escrita por quien responde (sirve para identificarla cuando no trae código).';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."nivel_cargo" IS 'Nivel de cargo agrupado.';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."ciudad" IS 'Ciudad unificada.';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."nps_actho" IS 'Probabilidad de recomendar ACTHO a un colega, 0-10 (NPS de la asociación).';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."nps_categoria" IS 'Promotor (9-10), Pasivo (7-8) o Detractor (0-6).';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."razon_nps" IS 'Razón principal de la calificación NPS.';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."motivo_afiliacion" IS 'Qué motivó la afiliación (opciones marcadas, separadas por '';'').';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."cumplimiento_expectativas" IS 'En qué medida ACTHO ha cumplido lo esperado, 1-5.';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."beneficios_usados" IS 'Beneficios usados en los últimos 90 días (opciones marcadas, separadas por '';'').';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."beneficio_mas_valor" IS 'Beneficio que más valor ha dado.';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."beneficio_desconocido" IS 'Beneficio que no sabía que tenía.';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."que_funciono" IS 'Lo que mejor ha funcionado.';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."que_no_funciono" IS 'Lo que no ha estado a la altura.';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."calif_bienvenida" IS 'Calificación del proceso de bienvenida, 1-5.';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."calif_ejecutiva" IS 'Calificación del acompañamiento de la ejecutiva de cuenta, 1-5.';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."intencion_renovar" IS 'Probabilidad de renovar la afiliación, 1-5.';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."quiere_contacto" IS 'Quiere que lo contacten para conversar de su experiencia.';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."acepta_tratamiento_datos" IS 'Aceptó la política de tratamiento de datos.';
+COMMENT ON COLUMN actho.fact_encuesta_relacion."es_prueba" IS '1 si es una respuesta de prueba (se excluye de los indicadores).';
+
 CREATE TABLE actho.reporte_calidad (
     "tabla" text,
     "campo" text,
@@ -360,3 +468,5 @@ CREATE INDEX ON actho.fact_encuesta_evento (evento_id);
 CREATE INDEX ON actho.fact_membresia (empresa_id);
 CREATE INDEX ON actho.dim_empresa (estado_membresia);
 CREATE INDEX ON actho.dim_empresa (ejecutiva_id);
+CREATE INDEX ON actho.fact_uso_beneficio (empresa_id);
+CREATE INDEX ON actho.fact_uso_beneficio (servicio_id);

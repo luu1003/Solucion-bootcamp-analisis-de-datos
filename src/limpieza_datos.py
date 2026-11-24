@@ -55,6 +55,54 @@ ARCHIVOS = {
     "enc_post": "3. Encuestas y NPS/ENCUESTA-POST-EVENTOS (PRESENCIAL Y VIRTUAL)_anonimizada.xlsx",
     "principal": "5. Indicadores y reportes actuales/Base de datos afiliados ACTHO_anonimizada.xlsx",
 }
+# Fuentes opcionales: si no están, sus tablas quedan vacías y el tablero muestra "listo para recibir".
+ARCHIVOS_OPCIONALES = {
+    "enc_90d": "3. Encuestas y NPS/90 días - NPS_sin respuestas (instrumento).xlsx",
+    "uso_beneficios": "8. Uso de beneficios/uso_beneficios.xlsx",
+}
+
+# ── Catálogo de servicios de la oferta 2027 (documento "Servicios y equivalencias con los datos") ──
+# incluido_*: 1 si el servicio viene incluido en ese nivel. fuente_dato: dónde queda registro hoy.
+# opcion_90d: opción de la pregunta 3.1 de la encuesta de 90 días que lo representa.
+CATALOGO_SERVICIOS = [
+    # id, servicio, línea, descripción, conectar, crecer, liderar, condición, fuente_dato, opcion_90d
+    ("S01", "Actho Legislativo", "Anticipar", "Webinar legal sobre cambios en la norma laboral", 1, 1, 1,
+     "Espacios VIP con abogados y autoridades solo en Liderar", "Asistencia", "Actualización legal"),
+    ("S02", "Actho en Marcha (boletín)", "Anticipar", "Boletín quincenal con alerta legal y novedades de IA", 0, 1, 1,
+     "Solo afiliados", "Plantilla mensual", "Boletin"),
+    ("S03", "Actho de Creación", "Anticipar", "Laboratorio práctico de IA aplicada al trabajo", 1, 1, 1,
+     "Activa la comunidad Talento Aumentado", "Asistencia", "Formación"),
+    ("S04", "GetAbstract y AI tip del mes", "Anticipar", "Resúmenes de libros de negocios y consejo mensual de IA", 1, 1, 1,
+     "Para toda la empresa afiliada", "Plantilla mensual", "Contenidos"),
+    ("S05", "Otros espacios de Anticipar", "Anticipar", "Webinars y foros temáticos de la línea Anticipar", 1, 1, 1,
+     "", "Asistencia", ""),
+    ("S06", "Actho de Valentía", "Pares", "Círculo cerrado donde la alta dirección comparte aprendizajes", 0, 0, 1,
+     "C-level, por invitación", "Asistencia", ""),
+    ("S07", "Actho de Autoridad", "Pares", "Conversación cercana con un líder de alto nivel", 0, 0, 1,
+     "C-level y VP", "Asistencia", ""),
+    ("S08", "Actho de Liderar", "Pares", "Experiencias vivenciales de liderazgo", 0, 0, 1,
+     "Conectar y Crecer con costo adicional", "Asistencia", "Networking"),
+    ("S09", "Comunidades", "Pares", "Siete grupos temáticos de conversación entre pares", 1, 1, 1,
+     "", "CRM y asistencia", "Comunidades"),
+    ("S10", "Actho de Evidencia", "Saber", "Mediciones nacionales de clima, bienestar y compensación", 0, 1, 1,
+     "En construcción; co-creación en Crecer y Liderar", "Sin registro", ""),
+    ("S11", "Actho de Presencia", "Proyectar", "Newsletter en LinkedIn con la columna de un líder", 0, 1, 1,
+     "", "Plantilla mensual", ""),
+    ("S12", "Actho Seguido (podcast)", "Proyectar", "Podcast de ACTHO", 0, 0, 1, "", "Plantilla mensual", ""),
+    ("S13", "Sello ACTHO", "Acompañar", "Distintivo de empresa afiliada", 1, 1, 1, "", "Plantilla mensual", "Sello ACTHO"),
+    ("S14", "Actho de Rumbo y primeros 90 días", "Acompañar", "Bienvenida, diagnóstico y conexión con consultores", 1, 1, 1,
+     "Solo empresas", "Plantilla mensual", ""),
+    ("S15", "Eventos grandes", "Transversal", "Foro híbrido, Semana del Talento, HR Global Day y Cumbre Laboral", 0, 1, 1,
+     "1 entrada por evento en Crecer, 2 en Liderar; Conectar con tarifa de afiliado", "Asistencia", "Eventos"),
+    ("S16", "Foros", "Transversal", "Foros de Gestión Humana y de Soluciones", 1, 1, 1, "", "Asistencia", ""),
+    ("S17", "Centro de Experiencias en Bogotá", "Transversal", "Espacio para eventos, talleres, comités y podcast", 0, 0, 0,
+     "Tarifa de afiliado en todos; descuento en Crecer y Liderar", "Plantilla mensual", ""),
+    ("S99", "Otro beneficio (autodeclarado)", "Otro", "Beneficio indicado como 'Otro' en la encuesta de 90 días", 0, 0, 0,
+     "", "Encuesta 90 días", "Otros (especifique)"),
+]
+EXPERIENCIA_SERVICIO = {"actho legislativo": "S01", "actho de liderar": "S08", "actho de autoridad": "S07",
+                        "actho de valentia": "S06", "actho de creacion": "S03"}
+LINEA_SERVICIO = {"evento grande": "S15", "foro": "S16", "anticipar": "S05", "pares": "S09"}
 
 COLUMNAS_CRM = {
     "ID de registro [anonimizado]": "registro_id",
@@ -438,6 +486,9 @@ def cargar_crm(ruta, corte):
     rellenar(df, t, ["tipo_empresa", "tipo_compania", "tamano_empresa", "rango_empleados", "sector",
                      "subsector", "ciudad", "departamento", "region", "pais", "tipo_consultora",
                      "tipo_membresia", "categoria_membresia"])
+    # Campo 'Estado' de Zoho (Activo/Inactivo): se conserva para conciliar con los informes de Zoho.
+    df["estado_crm"] = df["estado_registro"].map(
+        lambda v: {"activo": "Activo", "inactivo": "Inactivo"}.get(clave(v), "Sin dato") if isinstance(v, str) else "Sin dato")
     df = df.drop(columns=["ciudad_facturacion", "estado_registro"])
     return df.reset_index(drop=True), excluidos
 
@@ -742,6 +793,200 @@ def unificar_encuestas(partes, dim_empresa):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Encuesta de relación a 90 días (NPS de ACTHO)
+# ──────────────────────────────────────────────────────────────────────────────
+COLS_RELACION = ["respuesta_id", "fecha_respuesta", "persona_id", "empresa_id", "empresa_reportada", "nivel_cargo",
+                 "ciudad", "nps_actho", "nps_categoria", "razon_nps", "motivo_afiliacion", "cumplimiento_expectativas",
+                 "beneficios_usados", "beneficio_mas_valor", "beneficio_desconocido", "que_funciono", "que_no_funciono",
+                 "calif_bienvenida", "calif_ejecutiva", "intencion_renovar", "quiere_contacto",
+                 "acepta_tratamiento_datos", "es_prueba"]
+
+
+def _id_silencioso(serie, regex):
+    """Toma el código anonimizado si la celda lo trae; si trae un nombre real, queda vacío (sin registrarlo como error)."""
+    return serie.map(lambda v: re.sub(r"\s+", "", v).upper() if isinstance(v, str) else None) \
+                .map(lambda v: v if isinstance(v, str) and regex.match(v) else np.nan)
+
+
+def _opciones(d, prefijo):
+    """Columnas de selección múltiple 'N.N. Pregunta [Opción]' -> lista de opciones marcadas por fila."""
+    cols = [(c, re.search(r"\[(.+)\]\s*$", c).group(1).strip()) for c in d.columns
+            if clave(c).startswith(prefijo) and re.search(r"\[(.+)\]\s*$", c)]
+    return [[op for c, op in cols if isinstance(fila[c], str) and fila[c].strip()] for _, fila in d.iterrows()]
+
+
+def cargar_encuesta_90d(ruta, catalogo):
+    """Encuesta de relación a 90 días: NPS de la asociación, intención de renovar y beneficios usados.
+    Devuelve (respuestas, usos_declarados). Si el archivo no existe o no tiene respuestas, ambas quedan vacías."""
+    t = "fact_encuesta_relacion"
+    vacio = pd.DataFrame(columns=COLS_RELACION)
+    usos_vacio = pd.DataFrame(columns=["empresa_id", "persona_id", "servicio_id", "fecha", "cantidad", "fuente", "detalle"])
+    if ruta is None or not Path(ruta).exists():
+        informar(t, "(archivo)", "Encuesta de 90 días: archivo no encontrado (la tabla queda vacía)", 0)
+        return vacio, usos_vacio
+    d = leer_respuestas(ruta)
+    d = d[d[buscar(d, "id de respuesta", exacto_inicio=True)].notna()].reset_index(drop=True)
+    informar(t, "(archivo)", "Respuestas de la encuesta de 90 días", len(d))
+    if d.empty:
+        return vacio, usos_vacio
+    g = lambda *a, **k: buscar(d, *a, **k)
+    col = lambda c: d[c] if c else pd.Series([np.nan] * len(d))
+    out = pd.DataFrame({
+        "respuesta_id": d[g("id de respuesta", exacto_inicio=True)].astype(str).str.strip(),
+        "fecha_respuesta": col(g("respuesta completada")).map(parsear_fecha_es),
+        "persona_id": _id_silencioso(col(g("nombre completo", exacto_inicio=True)), RX_ID_PERSONA),
+        "empresa_id": _id_silencioso(col(g("nombre de la empresa", exacto_inicio=True)), RX_ID_EMPRESA),
+        "empresa_reportada": col(g("nombre de la empresa", exacto_inicio=True)).map(limpiar_texto),
+        "nivel_cargo": col(g("cargo", exacto_inicio=True)).map(limpiar_texto),
+        "ciudad": canonizar(col(g("ciudad", exacto_inicio=True)).map(limpiar_texto), MANUAL_CIUDAD),
+        "razon_nps": col(g("1.2.", exacto_inicio=True)).map(limpiar_texto),
+        "beneficio_mas_valor": col(g("3.2.", exacto_inicio=True)).map(limpiar_texto),
+        "beneficio_desconocido": col(g("3.3.", exacto_inicio=True)).map(limpiar_texto),
+        "que_funciono": col(g("4.1.", exacto_inicio=True)).map(limpiar_texto),
+        "que_no_funciono": col(g("4.2.", exacto_inicio=True)).map(limpiar_texto),
+        "quiere_contacto": col(g("6.2.", exacto_inicio=True)).map(si_no),
+        "acepta_tratamiento_datos": col(g("he leido y acepto")).map(si_no),
+    })
+    nps = pd.to_numeric(col(g("1.1.", exacto_inicio=True)).astype(str).str.extract(r"^\s*(\d+)")[0], errors="coerce")
+    fuera = nps.notna() & ~nps.between(0, 10)
+    registrar(t, "nps_actho", "Puntaje NPS fuera de 0-10", "Se anula", fuera.sum())
+    out["nps_actho"] = nps.where(~fuera)
+    out["nps_categoria"] = np.select([out["nps_actho"] >= 9, out["nps_actho"] >= 7, out["nps_actho"] >= 0],
+                                     ["Promotor", "Pasivo", "Detractor"], default=None)
+    for destino, frag in [("cumplimiento_expectativas", "2.2."), ("calif_bienvenida", "5.1."),
+                          ("calif_ejecutiva", "5.2."), ("intencion_renovar", "6.1.")]:
+        c = g(frag, exacto_inicio=True)
+        out[destino] = calificacion(col(c).astype(str).str.extract(r"^\s*(\d+)")[0], t, destino)
+    motivos, beneficios = _opciones(d, "2.1."), _opciones(d, "3.1.")
+    out["motivo_afiliacion"] = ["; ".join(m) if m else np.nan for m in motivos]
+    out["beneficios_usados"] = ["; ".join(b) if b else np.nan for b in beneficios]
+    # Respuestas de prueba (el instrumento se probó con una respuesta de ensayo).
+    texto = d.apply(lambda f: " ".join(str(x) for x in f if isinstance(x, str)).lower(), axis=1)
+    out["es_prueba"] = texto.str.contains(r"\bprueba\b|\btest\b|\bensayo\b", regex=True).astype(int)
+    registrar(t, "es_prueba", "Respuestas de prueba en el formulario", "Se marcan y se excluyen de los indicadores", out["es_prueba"].sum(), "Marcado")
+    registrar(t, "empresa_id", "Respuesta sin código de empresa reconocible", "Queda sin empresa; se guarda el nombre escrito en 'empresa_reportada'",
+              (out["empresa_id"].isna() & (out["es_prueba"] == 0)).sum(), "Revisar con ACTHO")
+
+    # Beneficios que dice haber usado -> uso de beneficios autodeclarado.
+    opcion_a_servicio = {clave(op): sid for sid, _, _, _, _, _, _, _, _, op in CATALOGO_SERVICIOS if op}
+    filas = []
+    for (_, r), lista in zip(out.iterrows(), beneficios):
+        if r["es_prueba"] or pd.isna(r["empresa_id"]):
+            continue
+        for op in lista:
+            filas.append(dict(empresa_id=r["empresa_id"], persona_id=r["persona_id"],
+                              servicio_id=opcion_a_servicio.get(clave(op), "S99"), fecha=r["fecha_respuesta"],
+                              cantidad=1, fuente="Encuesta 90 días (autodeclarado)", detalle=op))
+    return out[COLS_RELACION], pd.DataFrame(filas, columns=usos_vacio.columns)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Uso de beneficios: asistencia + comunidades + encuesta 90 días + plantilla mensual
+# ──────────────────────────────────────────────────────────────────────────────
+NOMBRE_COMUNIDAD = {"com_hr_estrategico": "HR Estratégico", "com_mas_que_un_salario": "Más que un salario",
+                    "com_talento_que_elige": "Talento que elige", "com_gente_que_crece": "Gente que crece",
+                    "com_talento_aumentado": "Talento aumentado", "com_mujeres_hr": "Mujeres que transforman"}
+COLS_PLANTILLA = ["fecha", "empresa_id", "persona_id", "servicio", "cantidad", "fuente", "detalle"]
+
+
+def construir_catalogo():
+    cat = pd.DataFrame(CATALOGO_SERVICIOS, columns=[
+        "servicio_id", "servicio", "linea_servicio", "descripcion", "incluido_conectar", "incluido_crecer",
+        "incluido_liderar", "condicion", "fuente_dato", "opcion_encuesta_90d"])
+    cat["medible"] = (cat["fuente_dato"] != "Sin registro").astype(int)
+    return cat
+
+
+def servicio_de_evento(experiencia, linea):
+    k = clave(experiencia) if isinstance(experiencia, str) else ""
+    if k.startswith("comunidad"):
+        return "S09"
+    for frag, sid in EXPERIENCIA_SERVICIO.items():
+        if k.startswith(frag):
+            return sid
+    return LINEA_SERVICIO.get(clave(linea) if isinstance(linea, str) else "", "S05")
+
+
+def _fecha_plantilla(v):
+    """Fecha de la plantilla: celda de fecha de Excel, AAAA-MM-DD o DD/MM/AAAA."""
+    if v is None or (not isinstance(v, str) and pd.isna(v)):
+        return pd.NaT
+    if not isinstance(v, str):
+        return pd.Timestamp(v)
+    v = v.strip()
+    if re.match(r"^\d{4}-\d{1,2}-\d{1,2}", v):
+        return pd.to_datetime(v[:10], errors="coerce", format="%Y-%m-%d")
+    return pd.to_datetime(v, errors="coerce", dayfirst=True)
+
+
+def cargar_plantilla_uso(ruta, catalogo, empresas_validas):
+    """Plantilla mensual (Datos/8. Uso de beneficios/uso_beneficios.xlsx) para los servicios que no dejan
+    registro automático: boletín, GetAbstract, Presencia, podcast, Sello, Centro de Experiencias, Rumbo."""
+    t = "fact_uso_beneficio"
+    vacio = pd.DataFrame(columns=["empresa_id", "persona_id", "servicio_id", "fecha", "cantidad", "fuente", "detalle"])
+    if ruta is None or not Path(ruta).exists():
+        informar(t, "(plantilla)", "Plantilla mensual de uso de beneficios: sin archivo (solo se usan asistencia, comunidades y encuesta)", 0)
+        return vacio
+    p = pd.read_excel(ruta, sheet_name="Registros")
+    p.columns = [clave(c).replace(" (opcional)", "").strip().replace(" ", "_") for c in p.columns]
+    faltan = [c for c in ["fecha", "empresa_id", "servicio"] if c not in p.columns]
+    if faltan:
+        raise SystemExit(f"La plantilla de uso de beneficios no tiene las columnas: {', '.join(faltan)}")
+    p = p.dropna(how="all")
+    informar(t, "(plantilla)", "Filas leídas de la plantilla mensual de uso de beneficios", len(p))
+    por_nombre = {clave(s): i for i, s in zip(catalogo["servicio_id"], catalogo["servicio"])}
+    por_id = set(catalogo["servicio_id"])
+    sid = p["servicio"].map(lambda v: (v.strip().upper() if isinstance(v, str) and v.strip().upper() in por_id
+                                       else por_nombre.get(clave(v))) if isinstance(v, str) else None)
+    out = pd.DataFrame({
+        "empresa_id": _id_silencioso(p["empresa_id"], RX_ID_EMPRESA),
+        "persona_id": _id_silencioso(p["persona_id"], RX_ID_PERSONA) if "persona_id" in p else np.nan,
+        "servicio_id": sid,
+        "fecha": p["fecha"].map(_fecha_plantilla),
+        "cantidad": pd.to_numeric(p["cantidad"], errors="coerce").fillna(1).astype(int) if "cantidad" in p else 1,
+        "fuente": ("Plantilla: " + p["fuente"].fillna("sin fuente").astype(str).map(limpiar_texto)) if "fuente" in p else "Plantilla mensual",
+        "detalle": p["detalle"].map(limpiar_texto) if "detalle" in p else np.nan,
+    })
+    malas = out["empresa_id"].isna() | ~out["empresa_id"].isin(empresas_validas) | out["servicio_id"].isna() | out["fecha"].isna()
+    registrar(t, "(plantilla)", "Filas de la plantilla con empresa, servicio o fecha no reconocidos",
+              "Se excluyen (revisar la plantilla)", malas.sum(), "Revisar con ACTHO")
+    return out[~malas]
+
+
+def construir_uso_beneficios(asistencia, eventos, dim_empresa, declarados, plantilla, corte):
+    """Una fila por uso de un beneficio. 'es_fechado' = 1 si el uso tiene fecha real (cuenta para la ventana
+    de 90 días); la vinculación a comunidades del CRM es un estado vigente, no una actividad fechada."""
+    t = "fact_uso_beneficio"
+    ev = eventos.set_index("evento_id")
+    a = asistencia[["empresa_id", "persona_id", "evento_id"]].copy()
+    a["servicio_id"] = [servicio_de_evento(ev.at[e, "experiencia"], ev.at[e, "linea_2027"]) for e in a["evento_id"]]
+    a["fecha"] = a["evento_id"].map(ev["fecha"])
+    a["cantidad"], a["fuente"] = 1, "Asistencia"
+    a["detalle"] = a["evento_id"].map(ev["nombre"])
+    a["es_fechado"] = 1
+    filas = []
+    crm = dim_empresa[dim_empresa["en_crm"] == 1]
+    for c, nombre in NOMBRE_COMUNIDAD.items():
+        if c not in crm:
+            continue
+        sub = crm[crm[c] > 0]
+        for emp, n in zip(sub["empresa_id"], sub[c]):
+            filas.append(dict(empresa_id=emp, persona_id=np.nan, servicio_id="S09", fecha=corte, cantidad=int(n),
+                              fuente="CRM (comunidad vigente)", detalle=nombre, es_fechado=0))
+    com = pd.DataFrame(filas)
+    informar(t, "fuente", "Vinculaciones vigentes a comunidades tomadas del CRM", len(com))
+    otros = pd.concat([declarados, plantilla], ignore_index=True).assign(es_fechado=1)
+    u = pd.concat([a.drop(columns=["evento_id"]), com, otros], ignore_index=True, sort=False)
+    u["fecha"] = pd.to_datetime(u["fecha"]).dt.normalize()
+    u["cantidad"] = pd.to_numeric(u["cantidad"], errors="coerce").fillna(1).astype(int)
+    u = u.sort_values(["empresa_id", "fecha", "servicio_id"]).reset_index(drop=True)
+    u.insert(0, "uso_id", np.arange(1, len(u) + 1))
+    for f, n in u.groupby("fuente").size().items():
+        informar(t, "fuente", f"Usos de beneficios desde '{f}'", n)
+    return u[["uso_id", "empresa_id", "persona_id", "servicio_id", "fecha", "cantidad", "fuente", "detalle", "es_fechado"]]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Personas, empresas no afiliadas, calendario y diccionario
 # ──────────────────────────────────────────────────────────────────────────────
 def construir_personas(asistencia, encuestas, ruta_principal):
@@ -910,6 +1155,36 @@ DESCRIPCIONES = {
     "com_talento_aumentado": "Pertenece a la comunidad 'Talento Aumentado' (0 = no).",
     "com_mujeres_hr": "Pertenece a la comunidad 'Mujeres HR' (0 = no).",
     "com_influenciador": "Marcado como influenciador en el CRM (0 = no).",
+    "estado_crm": "Campo 'Estado' de Zoho (Activo/Inactivo). Es el que cuentan los informes de Zoho; se conserva para conciliar.",
+    "servicio_id": "Código del servicio de la oferta 2027 (S01-S17; S99 = otro autodeclarado).",
+    "servicio": "Nombre del servicio de la oferta 2027.",
+    "linea_servicio": "Línea de la oferta 2027 del servicio (Anticipar, Saber, Pares, Proyectar, Acompañar, Transversal).",
+    "descripcion": "Descripción del servicio.",
+    "incluido_conectar": "1 si el servicio viene incluido en el nivel Conectar.",
+    "incluido_crecer": "1 si el servicio viene incluido en el nivel Crecer.",
+    "incluido_liderar": "1 si el servicio viene incluido en el nivel Liderar.",
+    "condicion": "Condiciones del servicio según el nivel (documento de equivalencias).",
+    "fuente_dato": "Dónde queda registro del uso hoy (Asistencia, CRM, Plantilla mensual, Encuesta 90 días o Sin registro).",
+    "opcion_encuesta_90d": "Opción de la pregunta 3.1 de la encuesta de 90 días que corresponde al servicio.",
+    "medible": "1 si hoy existe alguna fuente para medir el uso del servicio.",
+    "uso_id": "Consecutivo del uso de un beneficio.",
+    "cantidad": "Cantidad de usos (p. ej. personas vinculadas a una comunidad o aperturas del boletín).",
+    "fuente": "Origen del registro de uso: Asistencia, CRM (comunidad vigente), Encuesta 90 días o Plantilla.",
+    "es_fechado": "1 si el uso tiene fecha real (cuenta para la ventana de 90 días); 0 para estados vigentes como las comunidades.",
+    "empresa_reportada": "Empresa escrita por quien responde (sirve para identificarla cuando no trae código).",
+    "nps_actho": "Probabilidad de recomendar ACTHO a un colega, 0-10 (NPS de la asociación).",
+    "razon_nps": "Razón principal de la calificación NPS.",
+    "motivo_afiliacion": "Qué motivó la afiliación (opciones marcadas, separadas por ';').",
+    "cumplimiento_expectativas": "En qué medida ACTHO ha cumplido lo esperado, 1-5.",
+    "beneficios_usados": "Beneficios usados en los últimos 90 días (opciones marcadas, separadas por ';').",
+    "beneficio_mas_valor": "Beneficio que más valor ha dado.",
+    "beneficio_desconocido": "Beneficio que no sabía que tenía.",
+    "que_funciono": "Lo que mejor ha funcionado.", "que_no_funciono": "Lo que no ha estado a la altura.",
+    "calif_bienvenida": "Calificación del proceso de bienvenida, 1-5.",
+    "calif_ejecutiva": "Calificación del acompañamiento de la ejecutiva de cuenta, 1-5.",
+    "intencion_renovar": "Probabilidad de renovar la afiliación, 1-5.",
+    "quiere_contacto": "Quiere que lo contacten para conversar de su experiencia.",
+    "es_prueba": "1 si es una respuesta de prueba (se excluye de los indicadores).",
 }
 
 
@@ -943,6 +1218,7 @@ def main():
     corte = pd.Timestamp(args.fecha_corte) if args.fecha_corte else pd.Timestamp.today().normalize()
     print(f"Fecha de corte: {corte.date()}")
     ruta = {k: datos / v for k, v in ARCHIVOS.items()}
+    ruta_opc = {k: datos / v for k, v in ARCHIVOS_OPCIONALES.items()}
 
     crm, excluidos = cargar_crm(ruta["crm"], corte)
     dim_empresa, membresias = consolidar_empresas(crm)
@@ -954,10 +1230,15 @@ def main():
     enc_post, temas = cargar_encuesta_post(ruta["enc_post"], eventos)
     temas_pres = pd.concat([enc_pres[["respuesta_id", "temas_solicitados"]], enc_virt[["respuesta_id", "temas_solicitados"]]])
     encuestas = unificar_encuestas([enc_pres, enc_virt, enc_post], dim_empresa)
+    catalogo = construir_catalogo()
+    relacion, declarados = cargar_encuesta_90d(ruta_opc["enc_90d"], catalogo)
 
     principal = pd.read_excel(ruta["principal"])
     ids_principal = validar_id(principal.iloc[:, 0], RX_ID_EMPRESA, "dim_persona", "empresa_id").dropna()
-    dim_empresa = completar_empresas(dim_empresa, asistencia["empresa_id"].dropna(), encuestas["empresa_id"].dropna(), ids_principal)
+    ids_encuesta = pd.concat([encuestas["empresa_id"], relacion["empresa_id"]]).dropna()
+    dim_empresa = completar_empresas(dim_empresa, asistencia["empresa_id"].dropna(), ids_encuesta, ids_principal)
+    plantilla = cargar_plantilla_uso(ruta_opc["uso_beneficios"], catalogo, set(dim_empresa["empresa_id"]))
+    uso = construir_uso_beneficios(asistencia, eventos, dim_empresa, declarados, plantilla, corte)
 
     # Ejecutivas.
     ej = pd.DataFrame({"nombre": sorted(dim_empresa["ejecutiva"].dropna().unique())})
@@ -989,7 +1270,7 @@ def main():
     # Columnas finales y orden.
     dim_empresa = dim_empresa.drop(columns=["ejecutiva", "registro_id"], errors="ignore")
     membresias = membresias[["registro_id", "empresa_id", "ejecutiva_id", "tipo_membresia", "categoria_membresia", "nivel_2027",
-                             "estado_membresia", "es_activo", "es_vigente", "fecha_afiliacion", "miembro_desde",
+                             "estado_membresia", "estado_crm", "es_activo", "es_vigente", "fecha_afiliacion", "miembro_desde",
                              "fecha_expiracion", "dias_a_vencer", "rango_vencimiento", "inconsistencia", "es_registro_principal"]]
     ej_out = ej
     temas_out = temas.merge(encuestas[["respuesta_id", "encuesta_id"]], on="respuesta_id", how="left")
@@ -1002,6 +1283,7 @@ def main():
         "dim_empresa": dim_empresa, "dim_persona": personas, "dim_evento": eventos, "dim_ejecutiva": ej_out,
         "dim_fecha": calendario, "fact_membresia": membresias, "fact_asistencia": asistencia,
         "fact_encuesta_evento": encuestas, "fact_encuesta_temas": temas_out,
+        "dim_servicio": catalogo, "fact_uso_beneficio": uso, "fact_encuesta_relacion": relacion,
     }
     for fecha_col_tabla in ["fecha_afiliacion", "fecha_expiracion", "miembro_desde"]:
         pass

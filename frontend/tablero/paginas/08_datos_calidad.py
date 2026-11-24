@@ -6,6 +6,55 @@ import streamlit as st
 
 import comun as c
 
+
+@st.cache_data(show_spinner=False)
+def plantilla_uso_xlsx(servicios: tuple) -> bytes:
+    """Plantilla mensual para registrar el uso de los beneficios que no dejan registro automático."""
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.worksheet.datavalidation import DataValidation
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Registros"
+    enc = ["fecha", "empresa_id", "persona_id (opcional)", "servicio", "cantidad", "fuente", "detalle (opcional)"]
+    ws.append(enc)
+    for celda in ws[1]:
+        celda.font = Font(bold=True, color="FFFFFF")
+        celda.fill = PatternFill("solid", fgColor="5B00D9")
+    for col, ancho in zip("ABCDEFG", [12, 12, 20, 36, 10, 24, 40]):
+        ws.column_dimensions[col].width = ancho
+    lista = wb.create_sheet("Servicios")
+    for sv in servicios:
+        lista.append([sv])
+    dv = DataValidation(type="list", formula1=f"=Servicios!$A$1:$A${len(servicios)}", allow_blank=False,
+                        showErrorMessage=True, errorTitle="Servicio no válido", error="Elige un servicio de la lista")
+    ws.add_data_validation(dv)
+    dv.add("D2:D5000")
+    ins = wb.create_sheet("Instrucciones", 0)
+    for linea in [
+        "Plantilla mensual de uso de beneficios · ACTHO",
+        "",
+        "Para qué: registrar el uso de los servicios que no dejan registro automático (boletín Actho en Marcha,",
+        "GetAbstract y AI tip, Actho de Presencia, Actho Seguido, Sello ACTHO, Centro de Experiencias, Actho de Rumbo).",
+        "",
+        "Cómo:",
+        "1. En la hoja Registros, una fila por uso: fecha (AAAA-MM-DD), código de la empresa (EMP-####),",
+        "   servicio (elígelo de la lista), cantidad (p. ej. personas o aperturas) y la fuente del dato.",
+        "2. Guarda el archivo como Datos/8. Uso de beneficios/uso_beneficios.xlsx (acumula los meses en el mismo archivo).",
+        "3. Corre python3 setup.py o espera la carga diaria de Airflow: el tablero lo incluye en «Uso de beneficios».",
+        "",
+        "Las filas con empresa, servicio o fecha no reconocidos se excluyen y aparecen en el diagnóstico de calidad.",
+        "",
+        "Ejemplo de una fila: 2026-11-15 | EMP-0019 | (vacío) | Actho en Marcha (boletín) | 1 | Plataforma de correo | Abrió el boletín",
+    ]:
+        ins.append([linea])
+    ins["A1"].font = Font(bold=True, size=14, color="5B00D9")
+    ins.column_dimensions["A"].width = 110
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
 c.encabezado("Datos y calidad", "De dónde vienen los datos, qué se corrigió y qué conviene cambiar en la captura",
              filtros=False)
 
@@ -74,6 +123,55 @@ with izq:
         fig.update_xaxes(title="", range=[0, 112], showticklabels=False, showgrid=False)
         c.grafico(fig, 340, "% de empresas del CRM sin el dato")
         st.caption("Las fechas de expiración vacías son normales en membresías canceladas.")
+    with c.tarjeta():
+        c.cabeza("Definiciones de los indicadores", "Propuesta para acordar con ACTHO · el ícono ? de cada tarjeta muestra la misma definición")
+        d = c.definiciones()
+        if len(d):
+            filas = [{"i": r.indicador, "d": r.definicion, "k": r.calculo or "", "f": r.fuente or "",
+                      "e": c.chip("Acordada", "OK") if r.estado == "Acordada" else c.chip("Por validar", "Alerta")}
+                     for r in d.itertuples()]
+            c.tabla_html(filas, [("Indicador", "i", "texto"), ("Definición", ("d", "k"), "texto"), ("Fuente", "f", "texto"),
+                                 ("Estado", "e", "html")])
+            c.descargar(d.drop(columns=["orden"]), "definiciones_indicadores_actho.csv", "Descargar para validar con ACTHO")
+            st.caption("Cuando ACTHO acuerde una definición, se marca como 'Acordada' en sql/vistas_dashboard.sql "
+                       "(tabla actho.definicion_indicador) y queda así en todo el tablero.")
+
+    with c.tarjeta():
+        c.cabeza("Conciliación con Zoho", "Por qué el informe de membresías de Zoho y el tablero muestran cifras distintas de activos")
+        if c.existe("actho.v_conciliacion_activos"):
+            conc = c.tabla("v_conciliacion_activos")
+            c.tabla_html([{"c": r.concepto, "n": c.fmt(r.cantidad)} for r in conc.itertuples()],
+                         [("Concepto", "c", "texto"), ("Cantidad", "n", "num")])
+            det = c.tabla("v_conciliacion_detalle")
+            partes = " · ".join(f"{r.estado_membresia}: <b>{c.fmt(r.registros_zoho_activo)}</b>" for r in det.itertuples())
+            c.hallazgo(f"Los registros con «Estado = Activo» en Zoho se reparten así según su estado de membresía: {partes}.")
+            malos = det[det["estado_membresia"].isin(["Expirado", "Cancelado", "Inactivo"])]["registros_zoho_activo"].sum()
+            if malos:
+                c.hallazgo(f"<b>{c.fmt(malos)} registros</b> figuran como activos en Zoho pero su membresía está expirada o cancelada: "
+                           "conviene corregirlos en el CRM.")
+
+    with c.tarjeta():
+        c.cabeza("Cobertura del uso de beneficios", "Qué servicios de la oferta 2027 ya dejan registro y cuántos usos hay")
+        cat = c.catalogo()
+        uso = c.uso_beneficios()
+        if len(cat):
+            n_uso = uso.groupby("servicio_id").agg(usos=("cantidad", "sum"), empresas=("empresa_id", "nunique"))
+            filas = []
+            for r in cat.itertuples():
+                tiene = r.servicio_id in n_uso.index
+                filas.append({"s": r.servicio, "l": r.linea_servicio, "f": r.fuente_dato,
+                              "u": c.fmt(n_uso.loc[r.servicio_id, "usos"]) if tiene else "0",
+                              "e": c.fmt(n_uso.loc[r.servicio_id, "empresas"]) if tiene else "0",
+                              "x": c.chip("Con datos", "OK") if tiene else (c.chip("Sin fuente", "Riesgo") if r.fuente_dato == "Sin registro"
+                                                                         else c.chip("Falta cargar", "Alerta"))})
+            c.tabla_html(filas, [("Servicio", ("s", "l"), "texto"), ("Fuente prevista", "f", "texto"), ("Usos", "u", "num"),
+                                 ("Empresas", "e", "num"), ("Estado", "x", "html")])
+            st.download_button("Descargar plantilla mensual de uso (Excel)",
+                               plantilla_uso_xlsx(tuple(cat[cat["fuente_dato"].isin(["Plantilla mensual", "Asistencia", "CRM y asistencia"])]["servicio"])),
+                               file_name="uso_beneficios.xlsx", icon=":material/download:", key="dl_plantilla",
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                               help="Llénala cada mes y guárdala en Datos/8. Uso de beneficios/uso_beneficios.xlsx")
+
     with st.expander("Diccionario de datos"):
         c.tabla_df(dic, height=400)
 
@@ -91,6 +189,10 @@ with der, c.panel():
     c.pulso([
         "<b>Pedir NIT y código de evento en cada encuesta</b><br><span>Hoy 142 respuestas no tienen empresa y "
         "el evento se infiere por la fecha.</span>",
+        "<b>Registrar el uso de los beneficios digitales</b><br><span>Boletín, GetAbstract, Presencia, podcast y Sello no dejan "
+        "rastro: la plantilla mensual de esta página los suma al indicador de uso.</span>",
+        "<b>Activar la encuesta de 90 días</b><br><span>Es la única fuente del NPS de ACTHO y de la intención de renovar; el "
+        "tablero ya está listo para recibirla.</span>",
         "<b>Guardar el motivo del retiro en Zoho</b><br><span>Con una lista cerrada, para medir por qué no renuevan.</span>",
         "<b>No sobrescribir la expiración al renovar</b><br><span>Registrar cada renovación como un movimiento; "
         "mientras tanto, la foto mensual de Airflow guarda el historial.</span>",
