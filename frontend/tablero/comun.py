@@ -33,19 +33,40 @@ sys.path.insert(0, str(RAIZ / "src"))
 # Tokens de diseño (variables "ACTHO · Color" del archivo de Figma)
 # ──────────────────────────────────────────────────────────────────────────────
 C = {
+    # Marca ACTHO
     "morado": "#5B00D9", "morado_700": "#5B00D9", "morado_500": "#7C3AED", "morado_900": "#2B0A6B",
     "morado_100": "#EFE6FF", "lavanda": "#EFE6FF", "lavanda_2": "#C9B2FF",
     "naranja": "#FF5A0F", "naranja_300": "#FF9A66", "naranja_suave": "#FFF0E8",
     "cian": "#22C7E8", "menta": "#EEF6F5", "blanco": "#FFFFFF",
     "tinta": "#1B1235", "gris": "#6E6787", "linea": "#E4E1EC",
-    "ok": "#0F8A5F", "ok_suave": "#DDF4EA", "alerta": "#B25E00", "alerta_suave": "#FFF0D6",
-    "riesgo": "#C93A22", "riesgo_suave": "#FFE5E0",
-    "rojo": "#E5484D", "amarillo": "#F5A524", "verde": "#12A57A",
+    # Variantes de la marca que cumplen contraste WCAG 2.1 AA
+    "naranja_texto": "#C2410C",   # texto naranja sobre blanco (5,2:1)
+    "naranja_accion": "#D14800",  # fondo de botones con texto blanco (4,5:1)
+    "cian_claro": "#8AE6F7",      # texto cian sobre morado (6,0:1)
+    "cian_graf": "#0B8199",       # cian para gráficos sobre blanco (4,6:1)
+    "lavanda_graf": "#9D75FF",    # lavanda para gráficos sobre blanco (3,3:1)
+    # Estados (chips): texto ≥ 4,5:1 sobre su fondo
+    "ok": "#0B6E4C", "ok_suave": "#DDF4EA", "alerta": "#8A4700", "alerta_suave": "#FFF0D6",
+    "riesgo": "#A8360A", "riesgo_suave": "#FFF0E8",
     "morado_osc": "#2B0A6B",
 }
-SEMAFORO = {"Rojo": C["rojo"], "Amarillo": C["amarillo"], "Verde": C["verde"]}
-SECUENCIA = [C["morado"], C["naranja"], C["lavanda_2"], C["cian"], C["morado_500"], C["naranja_300"]]
+# Una sola regla de color en todo el tablero: naranja = atender, lavanda = intermedio, morado = bien.
+SEMAFORO = {"Rojo": C["naranja"], "Amarillo": C["lavanda_graf"], "Verde": C["morado"]}
+SEM_TXT = {"Rojo": "Alto", "Amarillo": "Medio", "Verde": "Bajo"}
+RIESGO = {SEM_TXT[k]: v for k, v in SEMAFORO.items()}          # mismos colores con la etiqueta visible
+ORDEN_RIESGO = ["Alto", "Medio", "Bajo"]
+NPS_COLOR = {"Detractor": C["naranja"], "Pasivo": C["lavanda_graf"], "Promotor": C["morado"]}
+CONDICION = {"Afiliada": C["morado"], "No afiliada": C["cian_graf"]}
+MODALIDAD = {"Presencial": C["morado"], "Virtual": C["naranja"], "Híbrido": C["cian_graf"], "Hibrido": C["cian_graf"]}
+LINEA = {"Anticipar": C["morado"], "Evento grande": C["naranja"], "Foro": C["cian_graf"], "Pares": C["lavanda_graf"],
+         "Proyectar": C["morado_900"], "Sin línea": C["gris"]}
+SECUENCIA = [C["morado"], C["naranja"], C["cian_graf"], C["lavanda_graf"], C["morado_900"], C["naranja_300"]]
 TONOS = {"OK": "ok", "Alerta": "alerta", "Riesgo": "riesgo", "Morado": "morado", "Neutro": "neutro"}
+
+
+def riesgo_txt(s) -> str:
+    """'Rojo' -> 'Alto'. El semáforo se guarda con colores y se muestra como nivel de riesgo."""
+    return SEM_TXT.get(s, s if isinstance(s, str) else "Sin evaluar")
 METAS_2027 = {"renovacion": 90.0, "nps": 55.0}
 PAGINAS_ACTIVAS: set = set()   # la llena Inicio.py con las páginas visibles en el menú
 
@@ -95,9 +116,9 @@ header[data-testid="stHeader"] {{ background: transparent; }}
 [data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] * {{ color: {C['morado']} !important; }}
 [data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] span {{ font-weight: 600 !important; }}
 [data-testid="stNavSectionHeader"], [data-testid="stSidebarNav"] header, [data-testid="stSidebarNavSeparator"] + * {{ }}
-[data-testid="stNavSectionHeader"] {{ color: {C['cian']} !important; font-size: .68rem !important; font-weight: 600 !important;
+[data-testid="stNavSectionHeader"] {{ color: {C['cian_claro']} !important; font-size: .72rem !important; font-weight: 600 !important;
   letter-spacing: .08em; text-transform: uppercase; margin-top: .8rem !important; }}
-[data-testid="stNavSectionHeader"] * {{ color: {C['cian']} !important; }}
+[data-testid="stNavSectionHeader"] * {{ color: {C['cian_claro']} !important; }}
 [data-testid="stSidebarNavSeparator"] {{ border-color: rgba(255,255,255,.2); }}
 [data-testid="stSidebarHeader"] {{ padding-top: 1.4rem; padding-bottom: .4rem; }}
 [data-testid="stSidebarHeader"] img, [data-testid="stLogo"] {{ height: 2.9rem !important; max-width: 9rem; }}
@@ -108,7 +129,7 @@ header[data-testid="stHeader"] {{ background: transparent; }}
 [data-testid="stSidebar"] [data-baseweb="tag"] * {{ color: {C['tinta']} !important; }}
 [data-testid="stSidebar"] [data-baseweb="tag"] {{ background: {C['lavanda']} !important; }}
 [data-testid="stSidebar"] .stButton button {{ background: transparent; border: 1px solid rgba(255,255,255,.6); }}
-.lema-lateral {{ color: {C['cian']}; font-size: .8rem; font-weight: 500; margin: -.2rem 0 .2rem; }}
+.lema-lateral {{ color: {C['cian_claro']}; font-size: .8rem; font-weight: 500; margin: -.2rem 0 .2rem; }}
 .usuario {{ display:flex; align-items:center; gap:.65rem; border-top: 1px solid rgba(255,255,255,.2); padding-top: .9rem; margin-top: .6rem; }}
 .usuario .avatar {{ width: 36px; height: 36px; border-radius: 50%; background: #fff; color: {C['morado']} !important;
   display:flex; align-items:center; justify-content:center; font-weight: 700; font-size: .8rem; }}
@@ -123,7 +144,7 @@ header[data-testid="stHeader"] {{ background: transparent; }}
   border: 1px solid {C['linea']}; color: {C['tinta']}; white-space: nowrap; }}
 .pildora b {{ font-weight: 700; }}
 .pildora i {{ width: 9px; height: 9px; border-radius: 50%; display:inline-block; background: {C['gris']}; }}
-.pildora.ok i {{ background: {C['verde']}; }} .pildora.alerta i {{ background: {C['amarillo']}; }}
+.pildora.ok i {{ background: {C['cian_graf']}; }} .pildora.alerta i {{ background: {C['naranja']}; }}
 .pildora.riesgo i {{ background: {C['naranja']}; }} .pildora.morado i {{ background: {C['morado']}; }}
 
 /* ── Tarjetas (contenedores con borde) ── */
@@ -138,19 +159,20 @@ div[data-testid="stVerticalBlockBorderWrapper"][data-test-scroll-behavior], div[
 div[data-testid="stLayoutWrapper"] > div[data-testid="stVerticalBlock"][class*="border"] {{ }}
 .cabeza {{ margin: 0 0 .35rem; }}
 .cabeza h3 {{ font-size: 1.02rem !important; font-weight: 600 !important; color: {C['morado']} !important; margin: 0 !important; padding: 0 !important; line-height: 1.3 !important; }}
-.cabeza p {{ font-size: .74rem !important; font-weight: 500 !important; color: {C['naranja']} !important; margin: .1rem 0 0 !important; }}
-.cabeza.oscura h3 {{ color: #fff !important; }} .cabeza.oscura p {{ color: {C['cian']} !important; }}
+.cabeza p {{ font-size: .76rem !important; font-weight: 500 !important; color: {C['naranja_texto']} !important; margin: .1rem 0 0 !important; }}
+.cabeza.oscura h3 {{ color: #fff !important; }} .cabeza.oscura p {{ color: {C['cian_claro']} !important; }}
 
 /* ── KPI ── */
 .kpi {{ background:#fff; border-radius: 20px; padding: 1rem 1.15rem; height: 100%; display:flex; flex-direction:column; gap:.3rem; }}
-.kpi .et {{ font-size: .68rem; color: {C['gris']}; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }}
-.kpi .va {{ font-size: 2rem; font-weight: 700; color: {C['tinta']}; line-height: 1.05; letter-spacing: -.02em; }}
+.kpi .et {{ font-size: .7rem; color: {C['gris']}; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }}
+.kpi .va {{ font-size: clamp(1.45rem, 2.1vw, 2rem); font-weight: 700; color: {C['tinta']}; line-height: 1.05; letter-spacing: -.02em; white-space: nowrap; }}
+.kpi .et, .meta .et-meta {{ word-break: normal; overflow-wrap: normal; hyphens: manual; }}
 .kpi .no {{ font-size: .74rem; color: {C['gris']}; line-height: 1.35; }}
 .kpi.oscuro {{ background: {C['morado']}; }}
 .kpi.oscuro .et {{ color: {C['lavanda_2']}; }} .kpi.oscuro .va {{ color: #fff; }} .kpi.oscuro .no {{ color: {C['lavanda_2']}; }}
 
 /* ── Chips ── */
-.chip {{ display:inline-block; border-radius:999px; padding:.18rem .6rem; font-size:.68rem; font-weight:600; letter-spacing:.02em;
+.chip {{ display:inline-block; border-radius:999px; padding:.18rem .6rem; font-size:.7rem; font-weight:600; letter-spacing:.02em;
   width: fit-content; max-width: 100%; white-space: normal; line-height: 1.35; overflow-wrap: anywhere; }}
 .tabla .chip {{ white-space: nowrap; }}
 .chip.ok, .chip.verde {{ background:{C['ok_suave']}; color:{C['ok']}; }}
@@ -164,7 +186,7 @@ div[data-testid="stLayoutWrapper"] > div[data-testid="stVerticalBlock"][class*="
 /* Streamlit compensa el margen del último párrafo con margin-bottom:-16px; los componentes propios no lo tienen,
    así que se anula para que el bloque siguiente no se monte encima. */
 [data-testid="stMarkdownContainer"]:has(.fila-tarjetas, .titulo, .subtitulo, .pildoras, .cabeza, .tabla, .heroe, .act,
-  .hallazgo, .panel-titulo, .usuario, .lema-lateral, .login-hero, .login-titulo, .login-fila) {{ margin-bottom: 0 !important; }}
+  .hallazgo, .panel-titulo, .usuario, .lema-lateral, .login-hero, .login-titulo, .login-fila, .filtros-ayuda) {{ margin-bottom: 0 !important; }}
 /* Tarjetas que comparten fila: todas con la altura de la más alta. */
 [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stLayoutWrapper"]:only-child > div[class*="st-key-tarjeta"]) {{
   align-items: stretch !important; }}
@@ -175,14 +197,15 @@ div[data-testid="stLayoutWrapper"] > div[data-testid="stVerticalBlock"][class*="
 
 /* ── Filas de tarjetas del mismo tipo (altura uniforme) ── */
 .fila-tarjetas {{ display:grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: .85rem; align-items: stretch; }}
+@media (max-width: 1320px) {{ .kpi {{ padding: .9rem .9rem; }} .kpi .et {{ font-size: .66rem; letter-spacing: .03em; }} }}
 .fila-tarjetas > div {{ height: 100%; min-width: 0; }}
 @media (max-width: 1000px) {{ .fila-tarjetas {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} }}
-.et-meta {{ font-size: .68rem; color: {C['gris']}; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }}
+.et-meta {{ font-size: .7rem; color: {C['gris']}; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }}
 
 /* ── Metas 2027 ── */
 .meta {{ background:#fff; border-radius:20px; padding:1rem 1.15rem; height:100%; }}
 .meta .fila {{ display:flex; align-items:baseline; gap:.5rem; flex-wrap: wrap; margin-top:.3rem; }}
-.meta .va {{ font-size: 1.9rem; font-weight:700; color:{C['tinta']}; letter-spacing:-.02em; }}
+.meta .va {{ font-size: clamp(1.5rem, 2vw, 1.9rem); font-weight:700; color:{C['tinta']}; letter-spacing:-.02em; }}
 .meta .obj {{ font-size:.78rem; color:{C['gris']}; }}
 .meta .barra {{ height:10px; background:{C['menta']}; border-radius:999px; margin:.55rem 0 .45rem; overflow:hidden; }}
 .meta .barra div {{ height:100%; border-radius:999px; background:{C['naranja']}; }}
@@ -194,7 +217,7 @@ div[class*="st-key-panel"] div[class*="st-key-tarjeta"] {{ border-radius: 16px !
 div[class*="st-key-panel"] .stMarkdown p, div[class*="st-key-panel"] label {{ color: #fff; }}
 div[class*="st-key-panel"] div[class*="st-key-tarjeta"] .stMarkdown p {{ color: {C['tinta']}; }}
 .panel-titulo {{ color:#fff !important; font-size:1.08rem !important; font-weight:600 !important; margin:0 !important; }}
-.panel-lema {{ color:{C['cian']} !important; font-size:.76rem !important; font-weight:500 !important; margin:.1rem 0 .3rem !important; }}
+.panel-lema {{ color:{C['cian_claro']} !important; font-size:.76rem !important; font-weight:500 !important; margin:.1rem 0 .3rem !important; }}
 .act {{ background:#fff; border-radius:14px; padding:.7rem .85rem; margin-bottom:.55rem; }}
 .act b {{ display:block; color:{C['tinta']}; font-size:.84rem; font-weight:600; line-height:1.3; }}
 .act span {{ display:block; color:{C['gris']}; font-size:.75rem; line-height:1.35; margin-top:.15rem; }}
@@ -205,22 +228,24 @@ div[class*="st-key-panel"] div[class*="st-key-tarjeta"] .stMarkdown p {{ color: 
 
 /* ── Tabla HTML (componentes Tabla/Encabezado y Tabla/Fila) ── */
 .tabla {{ width:100%; border-collapse:collapse; }}
-.tabla th {{ font-size:.66rem; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:{C['gris']};
+.tabla th {{ white-space: nowrap; font-size:.7rem; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:{C['gris']};
   text-align:left; padding:.5rem .6rem; border-bottom:1px solid {C['linea']}; background:transparent; }}
 .tabla td {{ font-size:.82rem; color:{C['tinta']}; padding:.55rem .6rem; border-bottom:1px solid {C['linea']}; vertical-align:middle; }}
-.tabla td .t {{ font-weight:600; display:block; }} .tabla td .d {{ color:{C['gris']}; font-size:.72rem; display:block; }}
+.tabla td .t {{ font-weight:600; display:block; }} .tabla td .d {{ color:{C['gris']}; font-size:.74rem; display:block; }}
+.tabla td.nw, .tabla td.nw .t, .tabla td.nw .d {{ white-space: nowrap; }}
 .tabla tr:last-child td {{ border-bottom:none; }} .tabla td.num {{ text-align:right; font-variant-numeric: tabular-nums; }}
 
 /* ── Héroe (tarjeta morada "Pregúntale a Pulso") ── */
 .heroe {{ background:{C['morado']} url("{CINTA_URI}") no-repeat right 30px top -60px / 150px auto; border-radius:20px; padding:1.3rem 1.5rem; }}
-.heroe .lema {{ color:{C['cian']}; font-size:.8rem; font-weight:500; }}
+.heroe .lema {{ color:{C['cian_claro']}; font-size:.8rem; font-weight:500; }}
 .heroe h2 {{ color:#fff !important; font-size:1.35rem !important; font-weight:700 !important; margin:.2rem 0 .2rem !important; padding:0 !important; }}
 .heroe p {{ color:{C['lavanda_2']} !important; font-size:.85rem !important; max-width: 70%; margin:0 !important; }}
 
 /* ── Controles ── */
 .stButton button, .stDownloadButton button {{ border-radius: 999px !important; font-weight: 600 !important; padding: .45rem 1.2rem !important; }}
 .stButton button[kind="primary"], .stDownloadButton button[kind="primary"], button[data-testid="stBaseButton-primary"] {{
-  background: {C['naranja']} !important; border-color: {C['naranja']} !important; color: #fff !important; }}
+  background: {C['naranja_accion']} !important; border-color: {C['naranja_accion']} !important; color: #fff !important; }}
+.stButton button[kind="primary"]:hover, .stDownloadButton button[kind="primary"]:hover {{ background: {C['riesgo']} !important; border-color: {C['riesgo']} !important; }}
 button[data-testid="stBaseButton-secondary"] {{ background: #fff; color: {C['morado']}; border-color: {C['lavanda_2']}; }}
 [data-baseweb="select"] > div, [data-baseweb="input"], .stTextInput input, .stDateInput input {{ border-radius: 12px !important; }}
 [data-testid="stMain"] [data-baseweb="select"] > div, [data-testid="stMain"] [data-baseweb="input"] {{ background:#fff; border-color:{C['linea']}; }}
@@ -231,12 +256,59 @@ div[class*="st-key-panel"] [data-testid="stWidgetLabel"] p {{ color: {C['lavanda
 .stTabs [data-baseweb="tab"] p {{ font-weight:600; font-size:.85rem; color:{C['morado']}; }}
 .stTabs [aria-selected="true"] {{ background:{C['morado']}; }} .stTabs [aria-selected="true"] p {{ color:#fff !important; }}
 .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {{ display:none; }}
+/* Pestañas (Streamlit ≥ 1.6x: data-testid="stTab") como píldoras */
+[data-testid="stTabs"] [role="tablist"] {{ gap: .45rem; border: none !important; box-shadow: none !important; flex-wrap: wrap; }}
+[data-testid="stTabs"] [role="tablist"]::after, [data-testid="stTabs"] [role="tablist"]::before {{ display: none !important; }}
+[data-testid="stTab"] {{ background:#fff; border-radius:999px; padding:.5rem 1.15rem !important; height:auto !important;
+  border: 1px solid {C['linea']}; cursor: pointer; }}
+[data-testid="stTab"] p {{ font-weight:600 !important; font-size:.88rem !important; color:{C['morado']} !important; margin:0 !important; }}
+[data-testid="stTab"]:hover {{ border-color: {C['lavanda_graf']}; }}
+[data-testid="stTab"][aria-selected="true"] {{ background:{C['morado']}; border-color:{C['morado']}; }}
+[data-testid="stTab"][aria-selected="true"] p {{ color:#fff !important; }}
+[data-testid="stTab"] > div:not([data-testid]) {{ display:none !important; }}
 [data-testid="stSegmentedControl"] button, [data-testid="stButtonGroup"] button {{ border-radius: 999px !important; background:#fff; }}
 [data-testid="stButtonGroup"] button[aria-checked="true"], [data-testid="stButtonGroup"] button[kind*="Active"] {{
   background:{C['morado']} !important; color:#fff !important; border-color:{C['morado']} !important; }}
 [data-testid="stDataFrame"] {{ border-radius: 12px; overflow: hidden; }}
+[data-testid="stMain"] [data-testid="stExpander"] details {{ background:#fff; border:none; border-radius:20px; }}
+[data-testid="stMain"] [data-testid="stExpander"] summary p {{ color:{C['morado']}; font-weight:600; }}
 [data-testid="stAlert"] {{ border-radius: 14px; }}
+[data-testid="stAlert"]:has([data-testid="stAlertContentInfo"]) > div {{ background: {C['lavanda']} !important; color: {C['tinta']} !important; }}
+[data-testid="stAlertContentInfo"] p, [data-testid="stAlertContentInfo"] svg {{ color: {C['morado_900']} !important; fill: {C['morado']} !important; font-size: .9rem; }}
 [data-testid="stCaptionContainer"] {{ color: {C['gris']}; }}
+
+/* ── Chips del nivel de riesgo: punto del mismo color del gráfico + texto (no depende solo del color) ── */
+.chip.sem {{ background:#F1EFF5; color:{C['tinta']}; display:inline-flex; align-items:center; gap:.35rem; }}
+.chip.sem::before {{ content:''; width:8px; height:8px; border-radius:50%; background: var(--c); flex:none; }}
+.chip.sem.alto {{ background:{C['naranja_suave']}; color:{C['riesgo']}; }}
+.kpi.oscuro .chip.sem {{ background: rgba(255,255,255,.16); color:#fff; }}
+
+/* ── Barra de filtros sobre el panel ── */
+div[class*="st-key-barra_filtros"] {{ background:#FFFFFF; border-radius:20px; padding: .75rem 1rem .55rem !important; gap: .35rem !important; }}
+div[class*="st-key-barra_filtros"] [data-testid="stHorizontalBlock"] {{ gap: .6rem !important; align-items: flex-end; }}
+div[class*="st-key-barra_filtros"] [data-baseweb="select"] > div, div[class*="st-key-barra_filtros"] [data-baseweb="input"] {{
+  background: {C['menta']} !important; border-color: transparent !important; min-height: 40px; }}
+div[class*="st-key-barra_filtros"] [data-baseweb="tag"] {{ background: {C['lavanda']} !important; }}
+div[class*="st-key-barra_filtros"] [data-baseweb="tag"] span {{ color: {C['morado']} !important; font-weight: 600; }}
+div[class*="st-key-barra_filtros"] .stButton button {{ min-height: 40px; white-space: nowrap; }}
+.filtros-ayuda {{ font-size: .76rem; color: {C['gris']}; margin: 0; display:flex; align-items:center; gap:.4rem; }}
+.filtros-ayuda b {{ color: {C['morado']}; font-weight: 600; }}
+div[class*="st-key-xf_activos"] [data-testid="stHorizontalBlock"] {{ flex-wrap: wrap; gap: .4rem !important; align-items: center; }}
+div[class*="st-key-xf_activos"] [data-testid="stColumn"] {{ width: auto !important; flex: 0 0 auto !important; min-width: 0 !important; }}
+div[class*="st-key-xf_quitar"] button {{ background: {C['morado']} !important; color:#fff !important; border-color: {C['morado']} !important;
+  padding: .2rem .8rem !important; min-height: 0 !important; font-size: .76rem !important; }}
+div[class*="st-key-xf_quitar"] button p {{ font-size: .76rem !important; }}
+div[class*="st-key-limpiar_filtros"] button {{ padding: .2rem .8rem !important; min-height: 0 !important; }}
+div[class*="st-key-limpiar_filtros"] button p {{ font-size: .76rem !important; }}
+
+/* ── Gráficos interactivos: cursor de clic, como en Power BI ── */
+div[class*="st-key-gi_"] .nsewdrag, div[class*="st-key-gi_"] .pielayer path, div[class*="st-key-gi_"] .hm {{ cursor: pointer !important; }}
+
+/* ── Accesibilidad: foco visible al navegar con teclado (WCAG 2.4.7) ── */
+a:focus-visible, button:focus-visible, [role="tab"]:focus-visible, input:focus-visible, [tabindex]:focus-visible {{
+  outline: 3px solid {C['naranja']} !important; outline-offset: 2px !important; }}
+[data-testid="stSidebar"] a:focus-visible, [data-testid="stSidebar"] button:focus-visible {{ outline-color: {C['cian_claro']} !important; }}
+@media (prefers-reduced-motion: reduce) {{ * {{ transition: none !important; animation: none !important; }} }}
 </style>
 """
 
@@ -308,7 +380,13 @@ def verificar_conexion():
 
 @st.cache_data(ttl=300, show_spinner=False)
 def empresas() -> pd.DataFrame:
-    return tabla("v_empresa_360")
+    df = tabla("v_empresa_360")
+    # Mes de vencimiento (las ya vencidas cuentan en el mes de corte): dimensión del filtro cruzado
+    corte = pd.Timestamp(df["fecha_corte"].dropna().iloc[0]) if df["fecha_corte"].notna().any() else pd.Timestamp.today()
+    fx = pd.to_datetime(df["fecha_expiracion"])
+    df["mes_venc"] = fx.where(fx >= corte, corte).dt.strftime("%Y-%m").where(fx.notna())
+    df["riesgo"] = df["semaforo"].map(SEM_TXT)
+    return df
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -338,35 +416,102 @@ def ultima_carga():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Filtros globales (barra lateral)
+# Filtros globales (barra sobre el panel) y filtro cruzado (clic en los gráficos)
 # ──────────────────────────────────────────────────────────────────────────────
 FILTROS = [("nivel_2027", "Nivel 2027"), ("tipo_membresia", "Tipo de afiliado"), ("sector", "Sector"),
-           ("ciudad", "Ciudad"), ("ejecutiva", "Ejecutiva de cuenta")]
+           ("ciudad", "Ciudad"), ("ejecutiva", "Ejecutiva")]
+
+# Dimensiones del filtro cruzado: columna -> (etiqueta, alcance). 'emp' filtra empresas; 'det' filtra
+# asistencias o encuestas (y, por la empresa, todo lo demás), como una relación de Power BI.
+XF_DIMS = {
+    "semaforo": ("Riesgo", "emp"), "nivel_2027": ("Nivel", "emp"), "mes_venc": ("Vence en", "emp"),
+    "ejecutiva": ("Ejecutiva", "emp"),
+    "anio_mes": ("Mes", "det"), "condicion_empresa": ("Empresa", "det"), "linea_2027": ("Línea", "det"),
+    "modalidad": ("Modalidad", "det"), "nivel_cargo": ("Cargo", "det"), "nps_categoria": ("NPS", "det"),
+}
 
 
-def filtros_barra_lateral():
+def _g(col):
+    """Valor vigente de un filtro global (se guarda aparte del widget para que se conserve entre páginas)."""
+    return st.session_state.get(f"g_{col}")
+
+
+def _sincronizar(col):
+    st.session_state[f"g_{col}"] = st.session_state.get(f"w_{col}")
+
+
+def xf() -> dict:
+    return st.session_state.setdefault("xf", {})
+
+
+def valor_txt(dim, v) -> str:
+    if dim == "semaforo":
+        return riesgo_txt(v)
+    if dim in ("mes_venc", "anio_mes"):
+        return anio_mes_txt(v)
+    return str(v)
+
+
+def _limpiar_todo(fmin, fmax):
+    for col, _ in FILTROS:
+        st.session_state[f"g_{col}"] = []
+        st.session_state[f"w_{col}"] = []
+    st.session_state["g_periodo"] = (fmin, fmax)
+    st.session_state["w_periodo"] = (fmin, fmax)
+    xf().clear()
+    st.session_state["xf_ver"] = st.session_state.get("xf_ver", 0) + 1
+
+
+def _quitar_xf(dim):
+    xf().pop(dim, None)
+    st.session_state["xf_ver"] = st.session_state.get("xf_ver", 0) + 1
+
+
+def barra_filtros():
+    """Filtros globales sobre el contenido (periodo, nivel, tipo, sector, ciudad y ejecutiva) y, debajo,
+    los filtros activos por clic en los gráficos. Se conservan al cambiar de página."""
     e = empresas()
     vig = e[e["es_vigente"] == 1]
+    a = asistencia()
+    fmin, fmax = a["fecha_evento"].min().date(), a["fecha_evento"].max().date()
+    st.session_state.setdefault("g_periodo", (fmin, fmax))
+    with st.container(key="barra_filtros"):
+        cols = st.columns([1.95, 1, 1, 1.1, 1, 1])
+        st.session_state["w_periodo"] = _g("periodo")
+        cols[0].date_input("Periodo", key="w_periodo", min_value=date(2025, 1, 1), max_value=date(2027, 12, 31),
+                           format="DD/MM/YYYY", on_change=lambda: (
+                               st.session_state.__setitem__("g_periodo", st.session_state["w_periodo"])
+                               if len(st.session_state.get("w_periodo") or ()) == 2 else None))
+        for i, (col, et) in enumerate(FILTROS, start=1):
+            opciones = sorted(vig[col].dropna().unique().tolist())
+            st.session_state[f"w_{col}"] = [v for v in (_g(col) or []) if v in opciones]
+            cols[i].multiselect(et, opciones, key=f"w_{col}", placeholder="Todos", on_change=_sincronizar, args=(col,))
+        hay = hay_filtros_empresa() or bool(xf()) or tuple(_g("periodo") or ()) != (fmin, fmax)
+        izq, der = st.columns([6, 1], vertical_alignment="center")
+        activos = xf()
+        with izq:
+            if activos:
+                with st.container(key="xf_activos"):
+                    chips = st.columns(len(activos) + 1)
+                    chips[0].markdown('<p class="filtros-ayuda"><b>Filtrado por clic:</b></p>', unsafe_allow_html=True)
+                    for j, (dim, v) in enumerate(list(activos.items()), start=1):
+                        chips[j].button(f"{XF_DIMS[dim][0]}: {valor_txt(dim, v)}", key=f"xf_quitar_{dim}",
+                                        icon=":material/close:", on_click=_quitar_xf, args=(dim,),
+                                        help=f"Quitar el filtro de {XF_DIMS[dim][0].lower()}")
+            else:
+                st.markdown('<p class="filtros-ayuda">Clic en una barra, segmento o punto de un gráfico para filtrar '
+                            'todo el tablero; otro clic lo quita.</p>', unsafe_allow_html=True)
+        der.button("Limpiar", key="limpiar_filtros", icon=":material/filter_alt_off:", disabled=not hay,
+                   on_click=_limpiar_todo, args=(fmin, fmax), help="Quita todos los filtros", **ancho(st.button))
+
+
+def lateral_usuario():
+    """Barra lateral: lema, usuario y cierre de sesión (la navegación la pone st.navigation)."""
     with st.sidebar:
         st.markdown('<p class="lema-lateral">Sentimos el pulso.</p>', unsafe_allow_html=True)
-        with st.expander("Filtros", expanded=False, icon=":material/tune:"):
-            a = asistencia()
-            fmin, fmax = a["fecha_evento"].min().date(), a["fecha_evento"].max().date()
-            st.date_input("Periodo de eventos y encuestas", value=(fmin, fmax), key="f_periodo",
-                          min_value=date(2025, 1, 1), max_value=date(2027, 12, 31), format="DD/MM/YYYY")
-            for col, et in FILTROS:
-                opciones = sorted(vig[col].dropna().unique().tolist())
-                st.multiselect(et, opciones, key=f"f_{col}", placeholder="Todos")
-            if st.button("Limpiar filtros", **ancho(st.button)):
-                for col, _ in FILTROS:
-                    st.session_state[f"f_{col}"] = []
-                st.session_state["f_periodo"] = (fmin, fmax)
-                st.rerun()
-        activos = sum(1 for c, _ in FILTROS if st.session_state.get(f"f_{c}"))
-        st.caption(f"{activos} filtro(s) activo(s)" if activos else "Sin filtros: toda la base")
         sesion = st.session_state.get("sesion") or {"nombre": "Equipo ACTHO", "rol": "Dirección Ejecutiva"}
         iniciales = "".join(p[0] for p in sesion["nombre"].split()[:2]).upper() or "A"
-        st.markdown(f'<div class="usuario"><span class="avatar">{_e(iniciales)}</span><div><b>{_e(sesion["nombre"])}</b>'
+        st.markdown(f'<div class="usuario"><span class="avatar" aria-hidden="true">{_e(iniciales)}</span><div><b>{_e(sesion["nombre"])}</b>'
                     f'<small>{_e(sesion.get("rol", ""))}</small></div></div>', unsafe_allow_html=True)
         if st.session_state.get("sesion") and st.button("Cerrar sesión", key="cerrar_sesion", icon=":material/logout:",
                                                         **ancho(st.button)):
@@ -388,6 +533,22 @@ def ancho(funcion=None):
 MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
 
 
+def partir(texto: str, ancho: int = 24, max_lineas: int = 2) -> str:
+    """Parte una etiqueta larga en líneas (<br>) para que no se corte en los ejes."""
+    palabras, lineas, actual = str(texto).split(), [], ""
+    for p_ in palabras:
+        if len(actual) + len(p_) + 1 > ancho and actual:
+            lineas.append(actual)
+            actual = p_
+        else:
+            actual = f"{actual} {p_}".strip()
+    lineas.append(actual)
+    if len(lineas) > max_lineas:
+        lineas = lineas[:max_lineas]
+        lineas[-1] = lineas[-1][:ancho - 1].rstrip() + "…"
+    return "<br>".join(lineas)
+
+
 def mes_txt(f) -> str:
     """Timestamp -> 'nov 26' (etiqueta de mes en español para los ejes)."""
     f = pd.Timestamp(f)
@@ -402,53 +563,171 @@ def anio_mes_txt(v: str) -> str:
         return str(v)
 
 
-def grafico(fig, altura=320, sub=None, oscuro=False):
+def _desvanecer(color: str, alfa=0.28) -> str:
+    color = str(color)
+    if color.startswith("#") and len(color) == 7:
+        r, g, b = (int(color[i:i + 2], 16) for i in (1, 3, 5))
+        return f"rgba({r},{g},{b},{alfa})"
+    return color
+
+
+def _resaltar(fig, dims):
+    """Como en Power BI: el gráfico que origina el filtro no se filtra a sí mismo; resalta lo elegido y
+    atenúa el resto."""
+    act = {d: xf()[d] for d in dims if d in xf()}
+    if not act:
+        return
+    for tr in fig.data:
+        cd = getattr(tr, "customdata", None)
+        if cd is None or tr.type == "heatmap":
+            continue
+        sel = [all(str(fila[i]) == str(act[d]) for i, d in enumerate(dims) if d in act) for fila in cd]
+        if tr.type == "bar":
+            tr.marker.opacity = [1 if s_ else 0.28 for s_ in sel]
+        elif tr.type == "pie":
+            base = list(tr.marker.colors) if tr.marker.colors is not None else SECUENCIA
+            tr.marker.colors = [c_ if s_ else _desvanecer(c_) for c_, s_ in zip(base, sel)]
+            tr.pull = [0.06 if s_ else 0 for s_ in sel]
+        elif tr.type == "scatter" and tr.marker.symbol == "square":      # mapa de calor: lo resalta su página
+            continue
+        elif tr.type == "scatter":
+            tr.marker.size = [13 if s_ else 7 for s_ in sel]
+            tr.marker.line = dict(width=[3 if s_ else 0 for s_ in sel], color="#FFFFFF")
+
+
+def _al_clic(clave, dims):
+    """Callback del clic: fija (o quita, si se repite) los valores del punto en el filtro cruzado."""
+    ev = st.session_state.get(clave)
+    try:
+        puntos = ev["selection"]["points"]
+    except Exception:  # noqa: BLE001
+        puntos = []
+    if not puntos:
+        return
+    pt = puntos[0]
+    cd = pt.get("customdata")
+    if cd is None:
+        cd = [pt.get("label")]
+    if not isinstance(cd, (list, tuple)):
+        cd = [cd]
+    valores = {d: v for d, v in zip(dims, cd) if v is not None and str(v) not in ("", "nan", "None")}
+    if not valores:
+        return
+    f = xf()
+    if all(f.get(d) == v for d, v in valores.items()):
+        for d in valores:
+            f.pop(d, None)
+    else:
+        f.update(valores)
+    st.session_state["xf_ver"] = st.session_state.get("xf_ver", 0) + 1
+
+
+def grafico(fig, altura=320, sub=None, oscuro=False, dims=None, clave=None):
     """Dibuja un gráfico con el estilo de los wireframes: el título de la figura se muestra como
-    encabezado de tarjeta (morado + subtítulo naranja), barras redondeadas y leyenda abajo."""
+    encabezado de tarjeta (morado + subtítulo naranja), barras redondeadas y leyenda abajo.
+    Con dims (y customdata en el mismo orden), un clic filtra todo el tablero por esos valores."""
     titulo = fig.layout.title.text if fig.layout.title and fig.layout.title.text else None
     if titulo:
         cabeza(titulo, sub, oscuro)
+    # Leyenda arriba a la izquierda (como en Power BI): no choca con los títulos de los ejes
+    con_leyenda = any(t.type == "pie" for t in fig.data) or \
+        len([t for t in fig.data if t.showlegend is not False and t.name]) > 1
+    if fig.layout.showlegend is False:
+        con_leyenda = False
     fig.update_layout(title=None, height=altura, legend_title_text="", paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF",
-                      legend=dict(orientation="h", yanchor="top", y=-0.14, xanchor="left", x=0,
-                                  font=dict(size=11, color=C["gris"])),
-                      margin=dict(l=6, r=6, t=8, b=6))
+                      showlegend=con_leyenda,
+                      legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+                                  font=dict(size=12, color=C["tinta"]), itemclick=False, itemdoubleclick=False),
+                      margin=dict(l=6, r=6, t=34 if con_leyenda else 8, b=6), separators=",.")
     try:
         fig.update_layout(barcornerradius=6)
     except Exception:  # noqa: BLE001  (Plotly < 5.19)
         pass
-    fig.update_xaxes(automargin=True, title_font=dict(size=11, color=C["gris"]))
-    fig.update_yaxes(automargin=True, title_font=dict(size=11, color=C["gris"]))
-    st.plotly_chart(fig, config={"displayModeBar": False}, theme=None, **ancho(st.plotly_chart))
+    if any(getattr(t, "orientation", None) == "h" for t in fig.data):
+        fig.update_yaxes(ticksuffix="  ")      # aire entre la etiqueta y la barra
+    fig.update_xaxes(automargin=True, title_font=dict(size=12, color=C["gris"]), tickfont=dict(size=12, color=C["gris"]))
+    fig.update_yaxes(automargin=True, title_font=dict(size=12, color=C["gris"]), tickfont=dict(size=12, color=C["gris"]))
+    config = {"displayModeBar": False, "locale": "es"}
+    if dims:
+        _resaltar(fig, dims)
+        fig.update_layout(dragmode=False, clickmode="event+select", hovermode="closest")
+        k = f"gi_{clave or '_'.join(dims)}_{st.session_state.get('xf_ver', 0)}"
+        st.plotly_chart(fig, config=config, theme=None, key=k, on_select=lambda: _al_clic(k, dims),
+                        selection_mode="points", **ancho(st.plotly_chart))
+    else:
+        fig.update_layout(dragmode=False)
+        st.plotly_chart(fig, config=config, theme=None, **ancho(st.plotly_chart))
 
 
 def periodo():
-    p = st.session_state.get("f_periodo")
+    p = _g("periodo")
     if isinstance(p, (list, tuple)) and len(p) == 2:
         return pd.Timestamp(p[0]), pd.Timestamp(p[1])
     return None, None
 
 
-def filtrar_empresas(df: pd.DataFrame) -> pd.DataFrame:
-    for col, _ in FILTROS:
-        sel = st.session_state.get(f"f_{col}")
-        if sel:
-            df = df[df[col].isin(sel)]
-    return df
+def _activos(alcance, excluir=()):
+    return {d: v for d, v in xf().items() if XF_DIMS[d][1] == alcance and d not in excluir}
 
 
-def hay_filtros_empresa() -> bool:
-    return any(st.session_state.get(f"f_{c}") for c, _ in FILTROS)
-
-
-def filtrar_detalle(df: pd.DataFrame, col_fecha: str) -> pd.DataFrame:
+def _por_fecha(df, col_fecha):
     ini, fin = periodo()
     if ini is not None:
         f = pd.to_datetime(df[col_fecha])
         df = df[(f >= ini) & (f <= fin)]
-    if hay_filtros_empresa():
-        ids = set(filtrar_empresas(empresas())["empresa_id"])
+    return df
+
+
+def _aplicar(df, filtros):
+    for d, v in filtros.items():
+        if d in df.columns:
+            df = df[df[d].astype(str) == str(v)]
+    return df
+
+
+def _ids_detalle(excluir=()):
+    """Empresas con actividad que cumple los filtros cruzados de asistencia o encuestas (None si no hay)."""
+    det = _activos("det", excluir)
+    if not det:
+        return None
+    ids = set()
+    for df, col in ((asistencia(), "fecha_evento"), (encuestas(), "fecha_respuesta")):
+        if any(d in df.columns for d in det):
+            ids |= set(_aplicar(_por_fecha(df, col), det)["empresa_id"].dropna())
+    return ids
+
+
+def filtrar_empresas(df: pd.DataFrame, excluir=()) -> pd.DataFrame:
+    """Filtros globales + filtro cruzado. 'excluir' deja fuera las dimensiones del gráfico que se dibuja."""
+    for col, _ in FILTROS:
+        sel = _g(col)
+        if sel:
+            df = df[df[col].isin(sel)]
+    df = _aplicar(df, _activos("emp", excluir))
+    ids = _ids_detalle(excluir)
+    if ids is not None:
         df = df[df["empresa_id"].isin(ids)]
     return df
+
+
+def hay_filtros_empresa(excluir=()) -> bool:
+    return any(_g(c) for c, _ in FILTROS) or bool(_activos("emp", excluir)) or bool(_activos("det", excluir))
+
+
+def filtrar_detalle(df: pd.DataFrame, col_fecha: str, excluir=()) -> pd.DataFrame:
+    df = _por_fecha(df, col_fecha)
+    det = _activos("det", excluir)
+    df = _aplicar(df, det)
+    if any(_g(c) for c, _ in FILTROS) or _activos("emp", excluir) or any(d not in df.columns for d in det):
+        ids = set(filtrar_empresas(empresas(), excluir)["empresa_id"])
+        df = df[df["empresa_id"].isin(ids)]
+    return df
+
+
+def datos(excluir=()):
+    """(empresas, asistencia, encuestas) con todos los filtros, menos las dimensiones de 'excluir'."""
+    return (filtrar_empresas(empresas(), excluir), filtrar_detalle(asistencia(), "fecha_evento", excluir),
+            filtrar_detalle(encuestas(), "fecha_respuesta", excluir))
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -480,8 +759,9 @@ def _e(t) -> str:
     return html.escape(str(t))
 
 
-def encabezado(titulo: str, subtitulo: str, pildoras: list | None = None):
-    """Componente 'Encabezado de página': título, subtítulo y tres píldoras de estado (tono, texto)."""
+def encabezado(titulo: str, subtitulo: str, pildoras: list | None = None, filtros: bool = True):
+    """Componente 'Encabezado de página': título, subtítulo, tres píldoras de estado (tono, texto) y,
+    debajo, la barra de filtros del tablero (filtros=False en páginas de una sola empresa o de datos)."""
     if pildoras is None:
         p = parametros()
         carga = ultima_carga()
@@ -491,9 +771,12 @@ def encabezado(titulo: str, subtitulo: str, pildoras: list | None = None):
                      f"Última carga <b>{fecha_txt(carga) if carga is not None else 'manual'}</b>"),
                     ("Alerta" if calidad else "OK", f"<b>{calidad}</b> datos por revisar")]
     izq, der = st.columns([2.4, 2.6])
-    izq.markdown(f'<p class="titulo">{_e(titulo)}</p><p class="subtitulo">{_e(subtitulo)}</p>', unsafe_allow_html=True)
-    cuerpo = "".join(f'<span class="pildora {TONOS.get(t, "neutro")}"><i></i>{txt}</span>' for t, txt in pildoras)
-    der.markdown(f'<div class="pildoras">{cuerpo}</div>', unsafe_allow_html=True)
+    izq.markdown(f'<p class="titulo" role="heading" aria-level="1">{_e(titulo)}</p><p class="subtitulo">{_e(subtitulo)}</p>',
+                 unsafe_allow_html=True)
+    cuerpo = "".join(f'<span class="pildora {TONOS.get(t, "neutro")}"><i aria-hidden="true"></i>{txt}</span>' for t, txt in pildoras)
+    der.markdown(f'<div class="pildoras" role="status">{cuerpo}</div>', unsafe_allow_html=True)
+    if filtros:
+        barra_filtros()
 
 
 def chip(texto, tono="Neutro"):
@@ -502,7 +785,11 @@ def chip(texto, tono="Neutro"):
 
 
 def chip_semaforo(s):
-    return chip(s, {"Rojo": "Riesgo", "Amarillo": "Alerta", "Verde": "OK"}.get(s, "Neutro"))
+    """Chip del nivel de riesgo: punto del color del gráfico + texto (Alto, Medio, Bajo)."""
+    if s not in SEMAFORO:
+        return chip("Sin evaluar")
+    return (f'<span class="chip sem{" alto" if s == "Rojo" else ""}" style="--c:{SEMAFORO[s]}">'
+            f'Riesgo {_e(SEM_TXT[s].lower())}</span>')
 
 
 class _Fila:
@@ -610,17 +897,18 @@ def hallazgo(texto: str):
 def tabla_html(filas: list, columnas: list):
     """Tabla con el estilo de los componentes Tabla/Encabezado y Tabla/Fila.
     columnas: [(titulo, clave, tipo)] con tipo 'texto' | 'num' | 'html'. Una clave puede ser (titulo, detalle)."""
-    enc = "".join(f'<th style="text-align:{"right" if t == "num" else "left"}">{_e(n)}</th>' for n, _, t in columnas)
+    enc = "".join(f'<th scope="col" style="text-align:{"right" if t == "num" else "left"}">{_e(n)}</th>' for n, _, t in columnas)
     cuerpo = ""
     for f in filas:
         celdas = ""
         for _, k, t in columnas:
+            clase = {"num": "num", "nw": "nw"}.get(t, "")
             if isinstance(k, tuple):
-                celdas += f'<td><span class="t">{_e(f[k[0]])}</span><span class="d">{_e(f[k[1]])}</span></td>'
+                celdas += f'<td class="{clase}"><span class="t">{_e(f[k[0]])}</span><span class="d">{_e(f[k[1]])}</span></td>'
             elif t == "html":
                 celdas += f"<td>{f[k]}</td>"
             else:
-                celdas += f'<td class="{"num" if t == "num" else ""}">{_e(f[k])}</td>'
+                celdas += f'<td class="{clase}">{_e(f[k])}</td>'
         cuerpo += f"<tr>{celdas}</tr>"
     st.markdown(f'<table class="tabla"><thead><tr>{enc}</tr></thead><tbody>{cuerpo}</tbody></table>', unsafe_allow_html=True)
 

@@ -2,6 +2,8 @@
 """04 · Renovación y retención: calendario de vencimientos, cartera por ejecutiva y factores de retención."""
 import pandas as pd
 import plotly.express as px
+import plotly.colors as pcolors
+import plotly.graph_objects as go
 import streamlit as st
 
 import comun as c
@@ -24,7 +26,7 @@ k = c.fila(5)
 c.kpi(k[0], f"Vencen en {ventana} días", c.fmt(vig["dias_a_vencer"].between(0, ventana).sum()),
       "Membresías vigentes por renovar", oscuro=True,
       chip_=("Morado", f"{c.fmt((vig['rango_vencimiento'] == 'Vencida').sum())} vencidas en gracia"))
-c.kpi(k[1], "Prioridad alta", c.fmt((prox["semaforo"] == "Rojo").sum()), "En rojo dentro de la ventana",
+c.kpi(k[1], "Prioridad alta", c.fmt((prox["semaforo"] == "Rojo").sum()), "Con riesgo alto dentro de la ventana",
       chip_=("Riesgo", "Contactar primero"))
 c.kpi(k[2], "Sin participación", c.fmt((~prox["participa_en_ventana"].astype(bool)).sum()),
       "Sin asistencias en 90 días", chip_=("Alerta", "Reactivar antes de renovar"))
@@ -41,10 +43,12 @@ with izq:
             ["empresa_id", "semaforo", "ejecutiva", "nivel_2027", "fecha_expiracion", "dias_a_vencer",
              "inscripciones_12m", "satisfaccion_promedio", "motivos_riesgo"]].copy()
         lista["satisfaccion_promedio"] = lista["satisfaccion_promedio"].map(lambda v: c.fmt(v, 2))
-        sel = c.tabla_df(lista, height=330, on_select="rerun", selection_mode="single-row", key="ren_tabla",
+        lista["semaforo"] = lista["semaforo"].map(c.SEM_TXT).fillna("Sin evaluar")
+        sel = c.tabla_df(lista, height=min(330, 36 * (len(lista) + 1) + 4), on_select="rerun", selection_mode="single-row",
+                         key="ren_tabla",
                          column_config={
-                             "empresa_id": "Empresa", "semaforo": "Semáforo", "ejecutiva": "Ejecutiva",
-                             "nivel_2027": "Nivel",
+                             "empresa_id": "Empresa", "semaforo": "Riesgo", "ejecutiva": "Ejecutiva",
+                             "nivel_2027": st.column_config.TextColumn("Nivel", width="small"),
                              "fecha_expiracion": st.column_config.DateColumn("Vence", format="DD/MM/YYYY"),
                              "dias_a_vencer": st.column_config.NumberColumn("Días", format="%d"),
                              "inscripciones_12m": "Asist. 12m",
@@ -58,19 +62,50 @@ with izq:
             c.ir("03_ficha_360.py", lista.iloc[filas[0]]["empresa_id"])
 
     with c.tarjeta():
-        mes = vig[vig["fecha_expiracion"].notna() & (vig["fecha_expiracion"] <= corte + pd.DateOffset(months=12))].copy()
-        mes["mes"] = mes["fecha_expiracion"].clip(lower=corte).dt.to_period("M").dt.to_timestamp()
-        calor = mes.pivot_table(index="ejecutiva", columns="mes", values="empresa_id", aggfunc="count", fill_value=0)
-        calor.columns = [c.mes_txt(m) for m in calor.columns]
-        calor.index = [i.replace(" (cuenta ACTHO)", "") for i in calor.index]
-        fig = px.imshow(calor, text_auto=True, aspect="auto", title="Vencimientos por ejecutiva",
-                        color_continuous_scale=[c.C["menta"], c.C["lavanda_2"], c.C["morado"]])
-        fig.update_xaxes(title="", side="bottom")
-        fig.update_yaxes(title="")
-        fig.update_coloraxes(showscale=False)
-        c.grafico(fig, 300, "Membresías vigentes por mes de expiración")
+        dims = ["ejecutiva", "mes_venc"]
+        e_c, _, _ = c.datos(excluir=dims)
+        mes = e_c[(e_c["es_vigente"] == 1) & e_c["fecha_expiracion"].notna()
+                  & (e_c["fecha_expiracion"] <= corte + pd.DateOffset(months=12))]
+        calor = mes.pivot_table(index="ejecutiva", columns="mes_venc", values="empresa_id", aggfunc="count", fill_value=0)
+        if calor.empty:
+            c.cabeza("Vencimientos por ejecutiva", "Membresías vigentes por mes de expiración")
+            st.info("No hay vencimientos en los próximos 12 meses con los filtros actuales.")
+        else:
+            # Mapa de calor dibujado con marcadores cuadrados: se ve igual y, a diferencia de go.Heatmap,
+            # admite el clic para filtrar.
+            celdas = calor.stack().reset_index(name="n")
+            celdas.columns = ["ejecutiva", "mes_venc", "n"]
+            celdas["x"] = celdas["mes_venc"].map(lambda m: c.anio_mes_txt(m).replace(" ", "<br>"))
+            celdas["y"] = celdas["ejecutiva"].str.replace(" (cuenta ACTHO)", "", regex=False)
+            maximo = max(celdas["n"].max(), 1)
+            escala = [[0, c.C["lavanda"]], [0.5, c.C["lavanda_graf"]], [1, c.C["morado"]]]
+            colores = ["#F6F2FF" if v == 0 else pcolors.sample_colorscale(escala, v / maximo, colortype="rgb")[0]
+                       for v in celdas["n"]]
+            sel_ = c.xf()
+            elegida = [(sel_.get("ejecutiva", ej) == ej) and (sel_.get("mes_venc", m) == m)
+                       for ej, m in zip(celdas["ejecutiva"], celdas["mes_venc"])]
+            hay_sel = any(d in sel_ for d in dims)
+            if hay_sel:   # como en Power BI: se atenúa lo que no está elegido
+                colores = [col if ok else col.replace("rgb(", "rgba(").replace(")", ",0.25)") if col.startswith("rgb(")
+                           else "rgba(246,242,255,0.4)" for col, ok in zip(colores, elegida)]
+            fig = go.Figure(go.Scatter(
+                x=celdas["x"], y=celdas["y"], mode="markers+text", text=celdas["n"],
+                textfont=dict(color=[c.C["gris"] if (v == 0 or (hay_sel and not ok)) else
+                                     (c.C["tinta"] if v < maximo * .5 else "#FFFFFF")
+                                     for v, ok in zip(celdas["n"], elegida)], size=12),
+                marker=dict(symbol="square", size=30, color=colores,
+                            line=dict(width=[3 if (hay_sel and ok) else 0 for ok in elegida], color=c.C["naranja"])),
+                customdata=celdas[["ejecutiva", "mes_venc"]].to_numpy(),
+                hovertemplate="%{y} · %{x}: <b>%{text}</b> vencimientos<extra></extra>", showlegend=False))
+            fig.update_layout(title="Vencimientos por ejecutiva")
+            fig.update_xaxes(title="", showgrid=False, ticks="", showline=False, categoryorder="array",
+                             categoryarray=list(dict.fromkeys(celdas["x"])))
+            fig.update_yaxes(title="", showgrid=False, ticks="", showline=False, autorange="reversed", categoryorder="array",
+                             categoryarray=list(dict.fromkeys(celdas["y"])))
+            c.grafico(fig, 60 + 38 * celdas["y"].nunique(),
+                      "Membresías vigentes por mes de expiración · clic en una celda para filtrar", dims=dims, clave="calor")
     with c.tarjeta():
-        c.cabeza("Seguimiento por ejecutiva de cuenta", "Cartera vigente, participación, satisfacción y semáforo")
+        c.cabeza("Seguimiento por ejecutiva de cuenta", "Cartera vigente, participación, satisfacción y empresas por nivel de riesgo")
         cart = vig.groupby("ejecutiva").agg(
             vigentes=("empresa_id", "count"),
             vencen_90=("dias_a_vencer", lambda s: s.between(0, 90).sum()),
@@ -81,21 +116,29 @@ with izq:
             amarillo=("semaforo", lambda s: (s == "Amarillo").sum()),
             verde=("semaforo", lambda s: (s == "Verde").sum()),
         ).reset_index().sort_values("rojo", ascending=False)
-        cart["participan"] = (100 * cart["participan"]).round(1)
+        cart["participan"] = (100 * pd.to_numeric(cart["participan"], errors="coerce")).round(1)
+        cart["satisfaccion"] = pd.to_numeric(cart["satisfaccion"], errors="coerce").map(lambda v: c.fmt(v, 2))
         c.tabla_df(cart, column_config={
-            "ejecutiva": "Ejecutiva", "vigentes": "Vigentes", "vencen_90": "Vencen 90 días", "vencidas": "Vencidas",
-            "participan": st.column_config.ProgressColumn("% participa", min_value=0, max_value=100, format="%.0f %%"),
-            "satisfaccion": st.column_config.NumberColumn("Satisf.", format="%.2f"),
-            "rojo": "Rojo", "amarillo": "Amarillo", "verde": "Verde"})
+            "ejecutiva": st.column_config.TextColumn("Ejecutiva", width="small"),
+            "vigentes": st.column_config.NumberColumn("Vigentes", width="small"),
+            "vencen_90": st.column_config.NumberColumn("Vencen 90 d", width="small"),
+            "vencidas": st.column_config.NumberColumn("Vencidas", width="small"),
+            "participan": st.column_config.ProgressColumn("% participa", min_value=0, max_value=100, format="%.0f %%", width="small"),
+            "satisfaccion": st.column_config.TextColumn("Satisf.", width="small"),
+            "rojo": st.column_config.NumberColumn("Alto", width="small", help="Empresas con riesgo alto"),
+            "amarillo": st.column_config.NumberColumn("Medio", width="small", help="Empresas con riesgo medio"),
+            "verde": st.column_config.NumberColumn("Bajo", width="small", help="Empresas con riesgo bajo")})
 
 with der, c.panel("Retención", "Qué se asocia con quedarse"):
     rel = c.tabla("v_relacion_participacion_renovacion")
     with c.tarjeta():
-        fig = px.bar(rel, x="nivel_participacion_12m", y="pct_vigentes", text="pct_vigentes",
+        fig = px.bar(rel, y="nivel_participacion_12m", x="pct_vigentes", text="pct_vigentes", orientation="h",
                      title="Vigencia según participación", color_discrete_sequence=[c.C["morado"]])
-        fig.update_yaxes(range=[0, 105], title="")
-        fig.update_xaxes(title="")
-        c.grafico(fig, 250, "% que sigue vigente · asistencias en 12 meses")
+        fig.update_traces(texttemplate="%{x:.0f} %", textposition="outside", cliponaxis=False,
+                          textfont=dict(color=c.C["tinta"]), hovertemplate="%{y}: <b>%{x:.1f} %</b> sigue vigente<extra></extra>")
+        fig.update_xaxes(range=[0, 125], title="", showticklabels=False, showgrid=False)
+        fig.update_yaxes(title="", autorange="reversed")
+        c.grafico(fig, 250, "% que sigue vigente · asistencias en 12 meses · toda la base")
     hist = c.tabla("v_movimientos_mensuales", "historial") if c.existe("historial.v_movimientos_mensuales") else pd.DataFrame()
     items = [
         "<b>Motivos de no renovación</b><br><span>El CRM no registra el motivo del retiro. Se propone capturarlo "
@@ -113,10 +156,13 @@ with der, c.panel("Retención", "Qué se asocia con quedarse"):
         ret = crm.groupby("antiguedad", observed=False).agg(empresas=("empresa_id", "count"),
                                                             vigentes=("es_vigente", "sum")).reset_index()
         ret["% vigente"] = (100 * ret["vigentes"] / ret["empresas"]).round(1)
-        fig = px.bar(ret, x="antiguedad", y="% vigente", text="% vigente", hover_data=["empresas"],
+        fig = px.bar(ret, y="antiguedad", x="% vigente", text="% vigente", custom_data=["empresas"], orientation="h",
                      title="Retención por antigüedad", color_discrete_sequence=[c.C["naranja"]])
-        fig.update_yaxes(range=[0, 105], title="")
-        fig.update_xaxes(title="")
+        fig.update_traces(texttemplate="%{x:.0f} %", textposition="outside", cliponaxis=False,
+                          textfont=dict(color=c.C["tinta"]),
+                          hovertemplate="%{y}: <b>%{x:.1f} %</b> vigente · %{customdata[0]} empresas<extra></extra>")
+        fig.update_xaxes(range=[0, 125], title="", showticklabels=False, showgrid=False)
+        fig.update_yaxes(title="", autorange="reversed")
         c.grafico(fig, 260, "% que sigue vigente según años de afiliación")
     for i in items:
         partes = i.split("<br>", 1)

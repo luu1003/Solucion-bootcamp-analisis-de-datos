@@ -6,7 +6,8 @@ import streamlit as st
 
 import comun as c
 
-c.encabezado("Datos y calidad", "De dónde vienen los datos, qué se corrigió y qué conviene cambiar en la captura")
+c.encabezado("Datos y calidad", "De dónde vienen los datos, qué se corrigió y qué conviene cambiar en la captura",
+             filtros=False)
 
 calidad = c.tabla("reporte_calidad")
 dic = c.tabla("diccionario_datos")
@@ -47,9 +48,13 @@ with izq:
         c.cabeza("Diagnóstico de calidad", "Qué se encontró en los datos y cómo se resolvió")
         acc = st.multiselect("Acción", sorted(calidad["accion"].unique()), placeholder="Todas", key="cal_accion")
         vista = calidad[calidad["accion"].isin(acc)] if acc else calidad
-        c.tabla_df(vista[["tabla", "campo", "problema", "regla_aplicada", "filas_afectadas", "accion"]], height=330,
-                   column_config={"problema": st.column_config.TextColumn("Problema", width="large"),
-                                  "regla_aplicada": st.column_config.TextColumn("Regla", width="medium")})
+        c.tabla_df(vista[["tabla", "campo", "problema", "regla_aplicada", "filas_afectadas", "accion"]].fillna("—"), height=330,
+                   column_config={"tabla": st.column_config.TextColumn("Tabla", width="small"),
+                                  "campo": st.column_config.TextColumn("Campo", width="small"),
+                                  "problema": st.column_config.TextColumn("Problema", width="large"),
+                                  "regla_aplicada": st.column_config.TextColumn("Regla", width="medium"),
+                                  "filas_afectadas": st.column_config.NumberColumn("Filas", width="small"),
+                                  "accion": st.column_config.TextColumn("Acción", width="medium")})
         c.descargar(calidad, "reporte_calidad.csv", "Descargar diagnóstico")
     with c.tarjeta():
         crm = c.tabla("dim_empresa")
@@ -63,8 +68,10 @@ with izq:
                                             for k in campos]}).sort_values("% sin dato")
         fig = px.bar(comp, x="% sin dato", y="Campo", orientation="h", text="% sin dato",
                      title="Completitud del CRM", color_discrete_sequence=[c.C["morado"]])
+        fig.update_traces(texttemplate="%{x:.0f} %", textposition="outside", cliponaxis=False,
+                          textfont=dict(color=c.C["tinta"]), hovertemplate="%{y}: <b>%{x:.1f} %</b> sin dato<extra></extra>")
         fig.update_yaxes(title="")
-        fig.update_xaxes(title="", range=[0, 100])
+        fig.update_xaxes(title="", range=[0, 112], showticklabels=False, showgrid=False)
         c.grafico(fig, 340, "% de empresas del CRM sin el dato")
         st.caption("Las fechas de expiración vacías son normales en membresías canceladas.")
     with st.expander("Diccionario de datos"):
@@ -75,7 +82,11 @@ with der, c.panel():
         cr = enc["tipo_cruce"].value_counts().reset_index()
         cr.columns = ["Cruce", "Respuestas"]
         fig = px.pie(cr, names="Cruce", values="Respuestas", hole=0.62, title="Identificación en encuestas",
-                     color_discrete_sequence=[c.C["morado"], c.C["cian"], c.C["naranja"], c.C["lavanda_2"]])
+                     color_discrete_sequence=[c.C["morado"], c.C["cian_graf"], c.C["naranja"], c.C["lavanda_graf"]])
+        fig.update_traces(textinfo="percent", insidetextorientation="horizontal",
+                          textfont=dict(size=13, color=["#FFFFFF", "#FFFFFF", c.C["tinta"], c.C["tinta"]]),
+                          hovertemplate="%{label}: <b>%{value}</b> respuestas (%{percent})<extra></extra>",
+                          marker=dict(line=dict(color="#FFFFFF", width=2)))
         c.grafico(fig, 260, "Cómo se asignó la empresa a cada respuesta")
     c.pulso([
         "<b>Pedir NIT y código de evento en cada encuesta</b><br><span>Hoy 142 respuestas no tienen empresa y "

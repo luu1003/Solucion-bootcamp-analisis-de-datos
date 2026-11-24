@@ -13,7 +13,8 @@ f1, f2, f3, f4 = st.columns([1.9, 1.2, 1.2, 1])
 universo = f1.segmented_control("Universo", ["Vigentes", "Todos en CRM", "No afiliados"], default="Vigentes",
                                 key="dir_universo") if hasattr(st, "segmented_control") else \
     f1.radio("Universo", ["Vigentes", "Todos en CRM", "No afiliados"], horizontal=True, key="dir_universo")
-semaforos = f2.multiselect("Semáforo", ["Rojo", "Amarillo", "Verde"], placeholder="Todos", key="dir_sem")
+semaforos = f2.multiselect("Riesgo", ["Rojo", "Amarillo", "Verde"], placeholder="Todos", key="dir_sem",
+                           format_func=c.riesgo_txt)
 venc = f3.multiselect("Vencimiento", ["Vencida", "0-30 días", "31-60 días", "61-90 días", "Más de 90 días", "Sin fecha"],
                       placeholder="Todos", key="dir_venc")
 buscar = f4.text_input("Buscar código", placeholder="EMP-0123", key="dir_buscar")
@@ -38,14 +39,15 @@ c.kpi(k[1], "Participación activa", c.fmt(100 * e["participa_en_ventana"].mean(
       "Con asistencia en los últimos 90 días", chip_=("Alerta", f"{c.fmt((~e['participa_en_ventana'].astype(bool)).sum())} sin asistir"))
 c.kpi(k[2], "Satisfacción promedio", c.fmt(e["satisfaccion_promedio"].mean(), 2), "Escala 1 a 5 · últimos 12 meses",
       chip_=("OK", f"{c.fmt(e['satisfaccion_promedio'].notna().sum())} con encuestas"))
-c.kpi(k[3], "Riesgo de no renovar", c.fmt((e["semaforo"] == "Rojo").sum()), "Empresas en rojo",
-      chip_=("Riesgo", f"{c.fmt((e['semaforo'] == 'Amarillo').sum())} en amarillo"))
+c.kpi(k[3], "Riesgo alto de no renovar", c.fmt((e["semaforo"] == "Rojo").sum()), "Empresas con riesgo alto",
+      chip_=("Riesgo", f"{c.fmt((e['semaforo'] == 'Amarillo').sum())} con riesgo medio"))
 
 orden = e.sort_values(["puntaje_riesgo", "dias_a_vencer"], ascending=[False, True])
 vista = orden[["empresa_id", "semaforo", "puntaje_riesgo", "nivel_2027", "tipo_membresia", "estado_membresia",
                "ejecutiva", "sector", "ciudad", "dias_a_vencer", "inscripciones_12m", "personas_distintas",
                "ultima_asistencia", "satisfaccion_promedio", "motivos_riesgo"]].copy()
 vista["satisfaccion_promedio"] = vista["satisfaccion_promedio"].map(lambda v: c.fmt(v, 2))
+vista["semaforo"] = vista["semaforo"].map(c.SEM_TXT).fillna("Sin evaluar")
 
 izq, der = st.columns([3, 1.05], gap="medium")
 with izq, c.tarjeta():
@@ -54,9 +56,9 @@ with izq, c.tarjeta():
         vista, height=520, on_select="rerun", selection_mode="single-row", key="dir_tabla",
         column_config={
             "empresa_id": st.column_config.TextColumn("Empresa"),
-            "semaforo": st.column_config.TextColumn("Semáforo"),
-            "puntaje_riesgo": st.column_config.ProgressColumn("Riesgo", min_value=0, max_value=9, format="%d"),
-            "nivel_2027": "Nivel", "tipo_membresia": "Tipo", "estado_membresia": "Estado",
+            "semaforo": st.column_config.TextColumn("Riesgo"),
+            "puntaje_riesgo": st.column_config.ProgressColumn("Puntaje", min_value=0, max_value=9, format="%d", width="small"),
+            "nivel_2027": st.column_config.TextColumn("Nivel", width="small"), "tipo_membresia": "Tipo", "estado_membresia": "Estado",
             "ejecutiva": "Ejecutiva", "sector": "Sector", "ciudad": "Ciudad",
             "dias_a_vencer": st.column_config.NumberColumn("Días a vencer", format="%d"),
             "inscripciones_12m": st.column_config.NumberColumn("Asist. 12m"),
@@ -87,6 +89,6 @@ with der, c.panel():
     else:
         c.pulso(["<b>Selecciona una empresa</b><br><span>Marca una fila de la tabla para ver su resumen "
                  "y su sugerencia de acción.</span>",
-                 f"<b>{c.fmt((e['semaforo'] == 'Rojo').sum())} empresas en rojo</b><br><span>Están arriba de la lista: "
+                 f"<b>{c.fmt((e['semaforo'] == 'Rojo').sum())} empresas con riesgo alto</b><br><span>Están arriba de la lista: "
                  "la tabla se ordena por riesgo y cercanía del vencimiento.</span>"],
                 titulo="Vista rápida", lema="Directorio ordenado por prioridad")

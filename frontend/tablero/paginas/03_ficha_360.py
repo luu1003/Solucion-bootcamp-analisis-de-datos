@@ -12,7 +12,7 @@ crm = todas[todas["en_crm"] == 1].sort_values(["es_vigente", "puntaje_riesgo"], 
 ids = crm["empresa_id"].tolist() + sorted(todas[todas["en_crm"] == 0]["empresa_id"].tolist())
 inicial = st.session_state.get("empresa_sel") or ids[0]
 
-c.encabezado("Ficha 360° del afiliado", "Todo lo que sabemos de una empresa en una sola vista")
+c.encabezado("Ficha 360° del afiliado", "Todo lo que sabemos de una empresa en una sola vista", filtros=False)
 emp_id = st.selectbox("Empresa", ids, index=ids.index(inicial) if inicial in ids else 0, key="ficha_empresa",
                       help="Por defecto aparecen primero las vigentes con mayor riesgo")
 st.session_state["empresa_sel"] = emp_id
@@ -39,7 +39,7 @@ st.markdown(
 
 k = c.fila(5)
 c.kpi(k[0], "Índice de salud", c.fmt(salud) if salud is not None else "—", "100 = sin alertas de riesgo", oscuro=True,
-      chip_=("Morado", emp["semaforo"]))
+      chip_=("Morado", f"Riesgo {c.riesgo_txt(emp['semaforo']).lower()}" if vigente else "No vigente"))
 if pd.notna(emp["dias_a_vencer"]):
     nota_vence = (f"vencida hace {c.fmt(-emp['dias_a_vencer'])} días" if emp["dias_a_vencer"] < 0
                   else f"en {c.fmt(emp['dias_a_vencer'])} días")
@@ -63,17 +63,20 @@ with izq:
                                             p["pts_detractor"]]})
             fig = go.Figure()
             fig.add_bar(y=comp["Componente"], x=comp["Máximo"], orientation="h", marker_color=c.C["lavanda"],
+                        marker_line=dict(color=c.C["lavanda_2"], width=1),
                         name="Máximo", hoverinfo="skip")
             fig.add_bar(y=comp["Componente"], x=comp["Puntos"], orientation="h", marker_color=c.C["naranja"],
-                        name="Puntos", text=comp["Puntos"], textposition="inside")
+                        name="Puntos", text=comp["Puntos"], textposition="inside", textfont=dict(color=c.C["tinta"]),
+                        hovertemplate="%{y}: <b>%{x}</b> puntos<extra></extra>")
             fig.update_layout(barmode="overlay", title="Componentes del riesgo", showlegend=False)
-            c.grafico(fig, 200, f"{c.fmt(emp['puntaje_riesgo'])} puntos de 9 · rojo desde {p['umbral_rojo']}")
+            c.grafico(fig, 200, f"{c.fmt(emp['puntaje_riesgo'])} puntos de 9 · riesgo alto desde {p['umbral_rojo']}")
     with g2:
         with c.tarjeta():
             if len(asis_e):
                 linea = asis_e.groupby(["anio_mes", "linea_2027"]).size().reset_index(name="inscripciones").sort_values("anio_mes")
                 linea["Mes"] = linea["anio_mes"].map(c.anio_mes_txt)
-                fig = px.bar(linea, x="Mes", y="inscripciones", color="linea_2027", title="Participación en experiencias")
+                fig = px.bar(linea, x="Mes", y="inscripciones", color="linea_2027", title="Participación en experiencias",
+                             color_discrete_map=c.LINEA, labels={"linea_2027": "Línea"})
                 fig.update_xaxes(title="")
                 fig.update_yaxes(title="", dtick=1)
                 c.grafico(fig, 200, "Inscripciones por mes y línea 2027")
@@ -98,10 +101,13 @@ with izq:
             c.cabeza("Personas de la empresa")
             if len(personas):
                 pc = personas.groupby("nivel_cargo").size().reset_index(name="personas").sort_values("personas")
-                fig = px.bar(pc, x="personas", y="nivel_cargo", orientation="h", color_discrete_sequence=[c.C["morado"]])
+                fig = px.bar(pc, x="personas", y="nivel_cargo", orientation="h", text="personas",
+                             color_discrete_sequence=[c.C["morado"]])
+                fig.update_traces(width=0.5 if len(pc) == 1 else None, textposition="outside", cliponaxis=False,
+                                  textfont=dict(color=c.C["tinta"]), hovertemplate="%{y}: <b>%{x}</b> personas<extra></extra>")
                 fig.update_yaxes(title="")
-                fig.update_xaxes(title="", dtick=1)
-                c.grafico(fig, 200)
+                fig.update_xaxes(title="", showticklabels=False, showgrid=False, range=[0, pc["personas"].max() * 1.25])
+                c.grafico(fig, max(140, 46 * len(pc) + 50))
                 st.caption(f"{c.fmt((personas['autoriza_datos'] == 'Sí').sum())} de {c.fmt(len(personas))} autorizan "
                            "el uso de sus datos para comunicaciones.")
             else:

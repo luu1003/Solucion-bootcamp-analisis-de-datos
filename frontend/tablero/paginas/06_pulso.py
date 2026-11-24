@@ -28,29 +28,31 @@ with tab1:
             h_ult = hist[hist["fecha_corte"] == ult].set_index("empresa_id")
             h_ant = hist[hist["fecha_corte"] == ant].set_index("empresa_id")["semaforo"]
             nuevos = h_ult[(h_ult["semaforo"] == "Rojo") & (h_ult.index.map(h_ant) != "Rojo")].reset_index()
-            c.cabeza(f"{c.fmt(len(nuevos))} empresas pasaron a rojo", f"Entre el {c.fecha_txt(ant)} y el {c.fecha_txt(ult)}")
+            c.cabeza(f"{c.fmt(len(nuevos))} empresas pasaron a riesgo alto", f"Entre el {c.fecha_txt(ant)} y el {c.fecha_txt(ult)}")
             evo = hist.groupby(["fecha_corte", "semaforo"]).size().reset_index(name="empresas").sort_values("fecha_corte")
             evo["Fecha de corte"] = evo["fecha_corte"].map(c.fecha_txt)
-            fig = px.line(evo, x="Fecha de corte", y="empresas", color="semaforo", markers=True,
-                          color_discrete_map=c.SEMAFORO, title="Evolución del semáforo")
+            evo["Riesgo"] = evo["semaforo"].map(c.SEM_TXT)
+            fig = px.line(evo, x="Fecha de corte", y="empresas", color="Riesgo", markers=True,
+                          color_discrete_map=c.RIESGO, category_orders={"Riesgo": c.ORDEN_RIESGO},
+                          title="Evolución del semáforo")
             fig.update_traces(line_width=3, marker_size=9)
             fig.update_xaxes(title="")
             fig.update_yaxes(title="")
-            c.grafico(fig, 240, "Empresas vigentes por color en cada recálculo diario")
+            c.grafico(fig, 240, "Empresas vigentes por nivel de riesgo en cada recálculo diario")
             tabla_alertas = nuevos[["empresa_id", "ejecutiva", "nivel_2027", "dias_a_vencer", "puntaje", "motivos"]]
         else:
-            c.cabeza("Alertas rojas actuales", "Empresas vigentes en rojo hoy")
+            c.cabeza("Alertas de riesgo alto", "Empresas vigentes con riesgo alto hoy")
             st.caption("El historial necesita al menos dos recálculos (DAG diario de Airflow) para mostrar cambios. "
-                       "Mientras tanto se listan las empresas en rojo hoy.")
+                       "Mientras tanto se listan las empresas con riesgo alto hoy.")
             tabla_alertas = vig[vig["semaforo"] == "Rojo"].sort_values("puntaje_riesgo", ascending=False)[
                 ["empresa_id", "ejecutiva", "nivel_2027", "dias_a_vencer", "puntaje_riesgo", "motivos_riesgo"]]
         tabla_alertas = tabla_alertas.rename(columns={"puntaje_riesgo": "puntaje", "motivos_riesgo": "motivos"})
         c.tabla_df(tabla_alertas, height=320, column_config={
             "empresa_id": "Empresa", "ejecutiva": "Ejecutiva", "nivel_2027": "Nivel",
             "dias_a_vencer": st.column_config.NumberColumn("Días a vencer", format="%d"),
-            "puntaje": st.column_config.ProgressColumn("Riesgo", min_value=0, max_value=9, format="%d"),
+            "puntaje": st.column_config.ProgressColumn("Puntaje", min_value=0, max_value=9, format="%d", width="small"),
             "motivos": st.column_config.TextColumn("Motivos", width="large")})
-        c.descargar(tabla_alertas, "alertas_rojas.csv", "Exportar alertas")
+        c.descargar(tabla_alertas, "alertas_riesgo_alto.csv", "Exportar alertas")
     with der, c.panel():
         comp = pd.Series({"Vencimiento": (vig["pts_vencimiento"] > 0).sum(),
                           "Participación": (vig["pts_participacion"] > 0).sum(),
@@ -67,9 +69,12 @@ with tab2:
     def barra(col, df, x, titulo, sub=None):
         t = df.groupby(x, observed=False).agg(empresas=("empresa_id", "count"), vigentes=("es_vigente", "sum")).reset_index()
         t["% vigente"] = (100 * t["vigentes"] / t["empresas"]).round(1)
-        fig = px.bar(t, x=x, y="% vigente", text="% vigente", hover_data=["empresas"], title=titulo,
+        fig = px.bar(t, x=x, y="% vigente", text="% vigente", custom_data=["empresas"], title=titulo,
                      color_discrete_sequence=[c.C["morado"]])
-        fig.update_yaxes(range=[0, 105], title="")
+        fig.update_traces(texttemplate="%{y:.0f} %", textposition="outside", cliponaxis=False,
+                          textfont=dict(color=c.C["tinta"]),
+                          hovertemplate="%{x}: <b>%{y:.1f} %</b> vigente · %{customdata[0]} empresas<extra></extra>")
+        fig.update_yaxes(range=[0, 118], title="")
         fig.update_xaxes(title="")
         with col:
             with c.tarjeta():
@@ -96,11 +101,11 @@ with tab3:
         pp = st.slider("Sin asistencias en la ventana", 0, 5, int(p["pts_sin_participacion"]))
         pp12 = st.slider("… y tampoco en 12 meses (adicional)", 0, 3, int(p["pts_sin_participacion_12m"]))
     with s3, c.tarjeta():
-        c.cabeza("Satisfacción y umbrales", "Cuándo es rojo o amarillo")
+        c.cabeza("Satisfacción y umbrales", "Cuándo el riesgo es alto o medio")
         ps = st.slider("Satisfacción baja", 0, 5, int(p["pts_satisfaccion_baja"]))
         umbral_sat = st.slider("Se considera baja por debajo de", 3.0, 5.0, float(p["umbral_satisfaccion_baja"]), step=0.1)
-        rojo = st.slider("Rojo desde (puntos)", 1, 12, int(p["umbral_rojo"]))
-        amarillo = st.slider("Amarillo desde (puntos)", 1, 12, int(p["umbral_amarillo"]))
+        rojo = st.slider("Riesgo alto desde (puntos)", 1, 12, int(p["umbral_rojo"]))
+        amarillo = st.slider("Riesgo medio desde (puntos)", 1, 12, int(p["umbral_amarillo"]))
 
     # Participación en la nueva ventana, desde el detalle de asistencia
     corte = pd.Timestamp(p["fecha_corte"])
@@ -115,23 +120,25 @@ with tab3:
                      np.where(vig["satisfaccion_promedio"] < umbral_sat, ps, 0))
     total = pts_v + pts_p + pts_s
     nuevo = np.where(total >= rojo, "Rojo", np.where(total >= amarillo, "Amarillo", "Verde"))
-    comp = pd.DataFrame({"Semáforo": ["Rojo", "Amarillo", "Verde"],
+    comp = pd.DataFrame({"Riesgo": c.ORDEN_RIESGO,
                          "Actual": [(vig["semaforo"] == s).sum() for s in ["Rojo", "Amarillo", "Verde"]],
                          "Simulado": [(nuevo == s).sum() for s in ["Rojo", "Amarillo", "Verde"]]})
-    larga = comp.melt("Semáforo", var_name="Escenario", value_name="Empresas")
+    larga = comp.melt("Riesgo", var_name="Escenario", value_name="Empresas")
     g1, g2 = st.columns([1.4, 1])
     with g1:
         with c.tarjeta():
-            fig = px.bar(larga, x="Semáforo", y="Empresas", color="Escenario", barmode="group", text="Empresas",
-                         color_discrete_map={"Actual": c.C["lavanda_2"], "Simulado": c.C["morado"]},
+            fig = px.bar(larga, x="Riesgo", y="Empresas", color="Escenario", barmode="group", text="Empresas",
+                         color_discrete_map={"Actual": c.C["lavanda_graf"], "Simulado": c.C["morado"]},
                          title="Semáforo actual frente al simulado")
+            fig.update_traces(textposition="outside", cliponaxis=False, textfont=dict(color=c.C["tinta"]))
+            fig.update_yaxes(range=[0, max(larga["Empresas"].max(), 1) * 1.18])
             fig.update_xaxes(title="")
             fig.update_yaxes(title="")
-            c.grafico(fig, 280, "Empresas vigentes por color")
+            c.grafico(fig, 280, "Empresas vigentes por nivel de riesgo")
     with g2, c.panel():
         cambian = (nuevo != vig["semaforo"].to_numpy()).sum()
-        c.pulso([f"<b>{c.fmt(cambian)} empresas cambiarían de color</b>",
-                 f"<b>{c.fmt((nuevo == 'Rojo').sum())} en rojo</b><br><span>"
+        c.pulso([f"<b>{c.fmt(cambian)} empresas cambiarían de nivel</b>",
+                 f"<b>{c.fmt((nuevo == 'Rojo').sum())} con riesgo alto</b><br><span>"
                  + (f"Son unas {c.fmt((nuevo == 'Rojo').sum() / max(vig['ejecutiva'].nunique(), 1), 0)} por ejecutiva: "
                     "valida con el equipo si es una carga que se puede contactar en el mes.")
                  + "</span>",

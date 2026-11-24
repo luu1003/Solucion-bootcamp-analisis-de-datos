@@ -34,7 +34,9 @@ izq, der = st.columns([2.2, 1], gap="medium")
 with izq:
     with c.tarjeta():
         c.cabeza("Lista para campaña", "Elige el segmento y exporta solo a quienes autorizaron")
-        elegido = st.selectbox("Segmento", list(USO.keys()), key="seg_elegido")
+        st.session_state.setdefault("seg_elegido", list(USO.keys())[0])
+        elegido = st.selectbox("Segmento", list(USO.keys()), key="seg_elegido",
+                               help="También puedes elegirlo con un clic en el gráfico de la derecha")
         solo_aut = st.toggle("Solo personas que autorizaron el tratamiento de datos (Ley 1581)", value=True, key="seg_aut")
         lista = seg[seg["segmento"] == elegido]
         if solo_aut:
@@ -49,10 +51,27 @@ with izq:
 with der, c.panel("Segmentos", "A quién dirigir cada mensaje"):
     with c.tarjeta():
         g = res.reset_index().rename(columns={"index": "segmento"})
-        fig = px.bar(g.sort_values("contactables"), x="contactables", y="segmento", orientation="h",
-                     title="Personas contactables", color_discrete_sequence=[c.C["morado"]])
+        g["color"] = [c.C["naranja"] if s_ == st.session_state.get("seg_elegido") else c.C["morado"] for s_ in g["segmento"]]
+        g = g.sort_values("contactables")
+        fig = px.bar(g, x="contactables", y="segmento", orientation="h", text="contactables", custom_data=["segmento"],
+                     title="Personas contactables")
+        fig.update_traces(marker_color=g["color"].tolist(), textposition="outside", cliponaxis=False,
+                          textfont=dict(color=c.C["tinta"]), hovertemplate="%{y}: <b>%{x}</b> contactables<extra></extra>")
         fig.update_yaxes(title="")
-        fig.update_xaxes(title="")
-        c.grafico(fig, 300, "Con autorización de datos, por segmento")
+        fig.update_xaxes(title="", range=[0, max(g["contactables"].max(), 1) * 1.38], showticklabels=False, showgrid=False)
+
+        def _elegir(k):
+            pts = (st.session_state.get(k) or {}).get("selection", {}).get("points", [])
+            if pts and pts[0].get("customdata"):
+                st.session_state["seg_elegido"] = pts[0]["customdata"][0]
+                st.session_state["seg_ver"] = st.session_state.get("seg_ver", 0) + 1
+
+        c.cabeza("Personas contactables", "Con autorización de datos · clic en un segmento para ver su lista")
+        fig.update_layout(title=None, height=300, dragmode=False, clickmode="event+select", showlegend=False,
+                          paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF", margin=dict(l=6, r=6, t=8, b=6))
+        fig.update_yaxes(ticksuffix="  ", automargin=True, tickfont=dict(size=12, color=c.C["gris"]))
+        clave = f"gi_seg_{st.session_state.get('seg_ver', 0)}"
+        st.plotly_chart(fig, config={"displayModeBar": False}, theme=None, key=clave, on_select=lambda: _elegir(clave),
+                        selection_mode="points", **c.ancho(st.plotly_chart))
     c.actividad("Protección de datos (Ley 1581)", "Las listas se exportan sin correo ni teléfono (no están en la base "
                 "del reto) y, por defecto, solo con personas que autorizaron.", acento=True)

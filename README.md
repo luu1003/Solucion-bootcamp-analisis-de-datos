@@ -957,7 +957,7 @@ Usuario inicial del tablero: **admin** / **actho**. Hay que cambiarlo antes de c
 | `src/ingesta_control.py` | Huellas, detección de cambios, validación, verificación, recálculo e historial |
 | `sql/control.sql` | Esquemas persistentes `ingesta` e `historial` |
 | `pipelines/airflow/dags/` | DAG `actho_ingesta_datos` y `actho_recalculo_riesgo_diario` (ver 7.9) |
-| `frontend/tablero/` | Tablero Streamlit: `Inicio.py` (navegación), `login.py` y `auth.py` (acceso), `comun.py` (datos, estilo y filtros), `paginas/` (8 pantallas, 3 visibles) (ver 7.10) |
+| `frontend/tablero/` | Tablero Streamlit: `Inicio.py` (navegación), `login.py` y `auth.py` (acceso), `comun.py` (datos, estilo y filtros), `paginas/` (8 pantallas) (ver 7.10) |
 | `.streamlit/config.toml` | Tema del tablero con los colores de ACTHO y la fuente Poppins |
 
 `Datos/`, `salida/`, `.env`, `.pgdata/`, `.postgres/` y cualquier `.xlsx`, `.csv` o `.pdf` están en `.gitignore`: los datos del reto nunca se suben al repositorio.
@@ -1066,7 +1066,7 @@ Los componentes están en `comun.py` (`encabezado`, `kpi`, `meta`, `cabeza`, `ta
 - Usuario inicial: `admin` / `actho` (en `auth.py`, solo para desarrollo).
 - Para crear o cambiar usuarios: `python frontend/tablero/auth.py` pide la contraseña y genera la sal y el hash. Estos se agregan en `.streamlit/secrets.toml` bajo `[usuarios]` (archivo fuera de Git), que tiene prioridad sobre los usuarios de `auth.py`.
 
-**Páginas visibles por ahora:** Dashboard, Afiliados y Experiencias. Las demás siguen en `paginas/` y se activan agregándolas a la lista `VISIBLES` de `Inicio.py`. Los botones que llevan a páginas ocultas (por ejemplo "Abrir ficha 360°") solo aparecen cuando esa página está activa.
+**Menú:** las 8 páginas están visibles y agrupadas en `Inicio.py` (`SECCIONES`): Resumen (Dashboard, Pulso), Cartera (Afiliados, Ficha 360°, Renovación y retención), Experiencias (Experiencias y NPS, Segmentos) y Datos (Datos y calidad).
 
 | Página | Wireframe | Para quién | Contenido |
 | --- | --- | --- | --- |
@@ -1079,7 +1079,11 @@ Los componentes están en `comun.py` (`encabezado`, `kpi`, `meta`, `cabeza`, `ta
 | Segmentos | — | Comunicaciones | Los 7 segmentos del reto con personas contactables (Ley 1581) y exportación |
 | Datos y calidad | 07 | Datos | Cargas de Airflow, diagnóstico de calidad, completitud del CRM, diccionario y recomendaciones de captura |
 
-**Filtros globales** (barra lateral, se mantienen al cambiar de página): periodo, nivel 2027, tipo de afiliado, sector, ciudad y ejecutiva, como pide el reto.
+**Filtros globales** (barra blanca sobre el contenido, se mantienen al cambiar de página): periodo, nivel 2027, tipo de afiliado, sector, ciudad y ejecutiva, como pide el reto. No aparecen en Ficha 360° ni en Datos y calidad.
+
+**Filtro cruzado (como en Power BI):** un clic en una barra, un segmento, un punto o una celda filtra todo el tablero; otro clic en el mismo elemento lo quita. El gráfico de origen no se filtra a sí mismo: resalta lo elegido y atenúa el resto. Los filtros activos aparecen como píldoras moradas bajo la barra de filtros, cada una con su botón para quitarla, y "Limpiar filtros" quita todo. Dimensiones: riesgo, nivel 2027, mes de vencimiento y ejecutiva (empresa); mes, condición afiliada/no afiliada, línea 2027, modalidad, nivel de cargo y categoría NPS (asistencias y encuestas, que filtran a las empresas por su actividad). La lógica está en `comun.py` (`XF_DIMS`, `datos()`, `grafico(..., dims=...)`).
+
+**Colores y accesibilidad:** una sola regla de color en todos los gráficos, con la paleta de ACTHO: naranja = atender, lavanda = intermedio, morado = bien (riesgo alto/medio/bajo, detractor/pasivo/promotor). El semáforo se muestra como *Riesgo alto, medio y bajo*; en la base sigue guardado como Rojo, Amarillo y Verde. Los textos y gráficos cumplen el contraste de WCAG 2.1 AA (variantes `naranja_texto`, `naranja_accion`, `cian_claro`, `cian_graf` y `lavanda_graf` en `comun.py`), el foco del teclado es visible y los chips de riesgo llevan texto, no solo color.
 
 **Cómo abrirlo:**
 

@@ -28,18 +28,31 @@ import login  # noqa: E402
 login.requerir_sesion()          # muestra el inicio de sesión si no hay sesión activa
 comun.verificar_conexion()
 
-# Páginas visibles por ahora. Las demás siguen en paginas/ y se activan agregándolas a esta lista:
-#   03_ficha_360.py (Ficha 360°) · 04_renovacion.py (Renovación y retención) · 06_pulso.py (Pulso)
-#   07_segmentos.py (Segmentos) · 08_datos_calidad.py (Datos y calidad)
-VISIBLES = [
-    ("01_panel_general.py", "Dashboard", ":material/dashboard:"),
-    ("02_afiliados.py", "Afiliados", ":material/groups:"),
-    ("05_experiencias_nps.py", "Experiencias", ":material/event:"),
-]
+# Menú agrupado por para quién es cada página (todas visibles).
+SECCIONES = {
+    "Resumen": [
+        ("01_panel_general.py", "Dashboard", ":material/dashboard:"),
+        ("06_pulso.py", "Pulso", ":material/monitor_heart:"),
+    ],
+    "Cartera": [
+        ("02_afiliados.py", "Afiliados", ":material/groups:"),
+        ("03_ficha_360.py", "Ficha 360°", ":material/badge:"),
+        ("04_renovacion.py", "Renovación y retención", ":material/autorenew:"),
+    ],
+    "Experiencias": [
+        ("05_experiencias_nps.py", "Experiencias y NPS", ":material/event:"),
+        ("07_segmentos.py", "Segmentos", ":material/campaign:"),
+    ],
+    "Datos": [
+        ("08_datos_calidad.py", "Datos y calidad", ":material/fact_check:"),
+    ],
+}
 comun.PAGINAS_ACTIVAS.clear()
-comun.PAGINAS_ACTIVAS.update(archivo for archivo, _, _ in VISIBLES)
+comun.PAGINAS_ACTIVAS.update(archivo for paginas in SECCIONES.values() for archivo, _, _ in paginas)
 
-pagina = st.navigation([st.Page(AQUI / "paginas" / archivo, title=titulo, icon=icono, default=(i == 0))
-                        for i, (archivo, titulo, icono) in enumerate(VISIBLES)])
-comun.filtros_barra_lateral()
+pagina = st.navigation({seccion: [st.Page(AQUI / "paginas" / archivo, title=titulo, icon=icono,
+                                          default=(archivo == "01_panel_general.py"))
+                                  for archivo, titulo, icono in paginas]
+                        for seccion, paginas in SECCIONES.items()})
+comun.lateral_usuario()
 pagina.run()
