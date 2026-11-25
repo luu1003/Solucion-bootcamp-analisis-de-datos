@@ -939,7 +939,7 @@ Solo se evalúan las membresías vigentes (Activo, Pronto a expirar, Periodo de 
 
 ### 7.8 Cómo ejecutar la versión actual
 
-Requisito: Python 3.9 o superior. No hace falta instalar PostgreSQL ni Docker: si no hay ninguno, `setup.py` pregunta y lo instala.
+Requisito: Python 3.9 o superior. No hace falta instalar PostgreSQL ni Docker: si no hay ninguno, `setup.py` lo instala sin preguntar.
 
 ```bash
 # 1. Copiar el paquete del reto en la carpeta Datos/ (no se sube a GitHub)
@@ -949,14 +949,16 @@ python3 setup.py              # Windows: py setup.py
 
 `setup.py` deja todo funcionando y abre el tablero en Google Chrome. Si un paso ya está hecho, lo salta (aparece `SALTO` en la consola):
 
-1. Verifica Python y crea `.venv` (si ya existe y funciona, lo salta).
+1. Verifica Python y crea el entorno virtual fuera del proyecto (ver el punto 4; si ya existe y funciona, lo salta). La carpeta `.venv` de versiones anteriores ya no se usa y se puede borrar.
 2. Instala `requirements.txt` (solo si cambió desde la última instalación).
 3. Configura VS Code y verifica la carpeta `Datos/`.
-4. Busca PostgreSQL en este orden: la URL de `.env`, luego `docker compose up -d postgres` y luego un PostgreSQL instalado en el equipo, con el que crea una base propia en `.pgdata/` (puerto 5433, solo `localhost`). Si no encuentra ninguno, pregunta `[Y/n]` e instala PostgreSQL 16 portátil en `.postgres/` (descarga única de unos 30 MB del paquete `pgserver` de PyPI, sin permisos de administrador). Guarda la conexión en `.env`.
-5. Limpia y carga los datos solo si alguna fuente cambió (huella SHA-256). Siempre recalcula el semáforo.
-6. Inicia Streamlit en `http://localhost:8501` (o el siguiente puerto libre), solo en `localhost`, y abre Chrome. `Ctrl+C` lo detiene.
+4. Busca PostgreSQL en este orden: la URL de `.env`, luego `docker compose up -d postgres` y luego un PostgreSQL instalado en el equipo (Homebrew, Postgres.app, `apt`), con el que crea una base propia (puerto 5433 o el siguiente libre, solo `localhost`). Si no encuentra ninguno, instala PostgreSQL 16 portátil (descarga única de unos 30 MB del paquete `pgserver` de PyPI, sin permisos de administrador). Si eso también falla y Docker Desktop está instalado pero cerrado, lo abre y lo usa. Guarda la conexión en `.env`.
+   - **Dónde quedan el entorno de Python y PostgreSQL:** fuera del proyecto, en `~/Library/Application Support/ACTHO` (macOS), `%LOCALAPPDATA%\ACTHO` (Windows) o `~/.local/share/actho` (Linux); se puede cambiar con la variable `ACTHO_DATOS`. Si el proyecto está en una carpeta sincronizada (iCloud Documentos con «Optimizar almacenamiento», OneDrive, Dropbox), sus miles de archivos se suben a la nube y se descargan al usarlos: en un Mac así, la base tardó más de 20 minutos en arrancar y los modelos 18 minutos en entrenar (13 segundos fuera de iCloud). Los `.pyc` también se guardan allá (`PYTHONPYCACHEPREFIX`). Si una versión anterior dejó `.pgdata/` o `.postgres/` dentro del proyecto, `setup.py` los mueve allá automáticamente sin perder el historial.
+   - Si el servidor tarda en arrancar, espera mostrando el avance; si falla, muestra las últimas líneas del registro del servidor.
+5. Limpia y carga los datos solo si alguna fuente cambió (huella SHA-256). Siempre recalcula el semáforo. Si cambiaron los datos o la fecha de corte, entrena los modelos de IA (sección 7.11) **en segundo plano** mientras el tablero ya está abierto (registro en `modelos_ia.log` de la misma carpeta); las secciones de IA aparecen al terminar. Con `--sin-tablero` los entrena antes de salir.
+6. Inicia Streamlit en `http://localhost:8501` (o el siguiente puerto libre), solo en `localhost`, espera hasta 4 minutos mostrando el avance y abre Chrome. `Ctrl+C` lo detiene. Todo lo que sale en la consola queda también en `setup.log`.
 
-Opciones: `--solo-instalar`, `--reinstalar`, `--forzar` (reprocesa aunque no haya cambios), `--fecha-corte AAAA-MM-DD`, `--sin-tablero`, `--sin-navegador`, `--puerto N` y `-y` (responde sí a las preguntas).
+Opciones: `--solo-instalar`, `--reinstalar`, `--forzar` (reprocesa aunque no haya cambios), `--fecha-corte AAAA-MM-DD`, `--sin-tablero`, `--sin-navegador` y `--puerto N`. `-y` se acepta por compatibilidad (ya no hay preguntas).
 
 Usuario inicial del tablero: **admin** / **actho**. Hay que cambiarlo antes de compartir el tablero (ver 7.10).
 
@@ -968,13 +970,15 @@ Usuario inicial del tablero: **admin** / **actho**. Hay que cambiarlo antes de c
 | `sql/esquema.sql` | DDL generado (tablas, llaves, comentarios, índices) |
 | `sql/vistas_dashboard.sql` | Parámetros y vistas del tablero |
 | `docker-compose.yml`, `.env.ejemplo` | PostgreSQL y Airflow locales, y plantilla de conexión |
-| `src/ingesta_control.py` | Huellas, detección de cambios, validación, verificación, recálculo e historial |
+| `src/ingesta_control.py` | Huellas, detección de cambios, validación, verificación, recálculo, historial y entrenamiento de modelos |
+| `src/modelos_ia.py`, `src/simulador_eventos.py` | Modelos de apoyo de IA (esquema `ia`) y simulador de eventos (ver 7.11) |
+| `src/recursos/` | Validación manual de temas (`temas_validacion.csv`) y correcciones de tema por evento (`temas_eventos.csv`) |
 | `sql/control.sql` | Esquemas persistentes `ingesta` e `historial` |
 | `pipelines/airflow/dags/` | DAG `actho_ingesta_datos` y `actho_recalculo_riesgo_diario` (ver 7.9) |
-| `frontend/tablero/` | Tablero Streamlit: `Inicio.py` (navegación), `login.py` y `auth.py` (acceso), `comun.py` (datos, estilo, filtros y filtro cruzado), `graficas.py` (constructor de gráficas), `extracto.py` (extracto de valor), `powerbi.py` (paquete de Power BI), `paginas/` (9 pantallas) (ver 7.10) |
+| `frontend/tablero/` | Tablero Streamlit: `Inicio.py` (navegación), `login.py` y `auth.py` (acceso), `comun.py` (datos, estilo, filtros y filtro cruzado), `graficas.py` (constructor de gráficas), `extracto.py` (extracto de valor), `powerbi.py` (paquete de Power BI), `ia.py` (lectura de los modelos y chip ✦ IA), `paginas/` (10 pantallas) (ver 7.10) |
 | `.streamlit/config.toml` | Tema del tablero con los colores de ACTHO y la fuente Poppins |
 
-`Datos/`, `salida/`, `.env`, `.pgdata/`, `.postgres/` y cualquier `.xlsx`, `.csv` o `.pdf` están en `.gitignore`: los datos del reto nunca se suben al repositorio.
+`Datos/`, `salida/`, `.env`, `.pgdata/`, `.postgres/` (de versiones anteriores) y cualquier `.xlsx`, `.csv` o `.pdf` están en `.gitignore`: los datos del reto nunca se suben al repositorio.
 
 ### 7.9 Orquestación con Airflow
 
@@ -991,6 +995,7 @@ flowchart LR
     end
     subgraph RSG[actho_recalculo_riesgo_diario · 6:00 a. m.]
         I[actualizar_semaforo<br/>fecha de corte = hoy] --> J[reportar_alertas<br/>nuevos en rojo]
+        I --> K[entrenar_modelos<br/>esquema ia]
     end
     H -- dispara --> I
 ```
@@ -1017,6 +1022,8 @@ Parámetros para la ejecución manual: `forzar` (procesar aunque no haya cambios
 - Guarda el semáforo de cada empresa vigente en `historial.evaluacion_riesgo`, con la huella de los parámetros usados (`version_reglas`).
 - Guarda la foto del mes de cada membresía en `historial.snapshot_membresia`.
 - Reporta las empresas que pasaron a **rojo** desde la evaluación anterior. Aquí se conectará la notificación a la ejecutiva (sección 9.2).
+- Reentrena los modelos de IA (`entrenar_modelos`, sección 7.11) si cambió la fecha de corte o si lo disparó una ingesta con datos nuevos. Airflow instala scikit-learn y statsmodels con `_PIP_ADDITIONAL_REQUIREMENTS` de `docker-compose.yml`.
+- Los planes de eventos que se guardan en Planeación de eventos quedan en `historial.plan_evento` (persistente).
 
 **Esquemas persistentes** (`sql/control.sql`). A diferencia de `actho`, que se recrea en cada carga, estos **no se borran**:
 
@@ -1080,19 +1087,20 @@ Los componentes están en `comun.py` (`encabezado`, `kpi`, `meta`, `cabeza`, `ta
 - Usuario inicial: `admin` / `actho` (en `auth.py`, solo para desarrollo).
 - Para crear o cambiar usuarios: `python frontend/tablero/auth.py` pide la contraseña y genera la sal y el hash. Estos se agregan en `.streamlit/secrets.toml` bajo `[usuarios]` (archivo fuera de Git), que tiene prioridad sobre los usuarios de `auth.py`.
 
-**Menú:** las 8 páginas están visibles y agrupadas en `Inicio.py` (`SECCIONES`): Resumen (Dashboard, Pulso), Cartera (Afiliados, Ficha 360°, Renovación y retención), Experiencias (Experiencias y NPS, Segmentos) y Datos (Datos y calidad).
+**Menú:** las 10 páginas están visibles y agrupadas en `Inicio.py` (`SECCIONES`): Resumen (Dashboard, Pulso), Cartera (Base de afiliados, Afiliados, Ficha 360°, Renovación y retención), Experiencias (Experiencias y NPS, Planeación de eventos, Segmentos) y Datos (Datos y calidad). Lo que sale de un modelo lleva el chip **✦ IA** y una nota con su métrica.
 
 | Página | Wireframe | Para quién | Contenido |
 | --- | --- | --- | --- |
-| Panel general | 01 | Dirección y Junta | Metas 2027 (renovación medida o aproximada, NPS de eventos y NPS de ACTHO), activos, vencimientos, uso de beneficios, satisfacción, semáforo, uso por servicio, vigentes por nivel, **constructor de gráficas** y botón **Ver en Power BI** |
-| Base de afiliados | 09 | Dirección y Comercial | Altas, retiros y neto acumulado de 24 meses; composición por tipo, tamaño, sector y ciudad; tabla nivel × tipo y exportación |
-| Afiliados | 02 | Comercial | Directorio filtrable y ordenado por riesgo; vista rápida y acceso a la ficha; exportación CSV |
-| Ficha 360° | 03 | Ejecutivas | Índice de salud, componentes del riesgo, **valor recibido del nivel** (beneficios usados, disponibles y sin registro), historial, personas, encuestas, acciones sugeridas y **extracto de valor** descargable |
-| Renovación y retención | 04 | Comercial y Dirección | Calendario de renovaciones a 30, 60 y 90 días, **extractos de valor en ZIP** para la campaña, tasa de renovación filtrable, mapa de vencimientos por ejecutiva y mes, retención y seguimiento por ejecutiva |
-| Experiencias y NPS | 05 | Experiencias | Participación por línea, modalidad y cargo; tabla de eventos; satisfacción por aspecto; distribución del NPS; **NPS de ACTHO** (encuesta de 90 días, intención de renovar, lista por encuestar); temas pedidos y comentarios |
-| Pulso | 06 | Dirección | Alertas y nuevos rojos (desde `historial`), factores asociados a la retención y **simulador de criterios** del semáforo |
-| Segmentos | — | Comunicaciones | Los segmentos del reto más «Encuesta de 90 días por enviar», con personas contactables (Ley 1581) y exportación |
-| Datos y calidad | 07 | Datos | Cargas de Airflow, diagnóstico de calidad, completitud del CRM, **definiciones de los indicadores** para acordar con ACTHO, **conciliación con Zoho**, **cobertura del uso de beneficios** y plantilla mensual, diccionario y recomendaciones de captura |
+| Panel general | 01 | Dirección y Junta | Metas 2027 (renovación medida o aproximada, NPS de eventos y NPS de ACTHO), activos, vencimientos, uso de beneficios, satisfacción, semáforo, uso por servicio, vigentes por nivel, **constructor de gráficas**, botón **Ver en Power BI** y ✦ proyección de la renovación sobre la meta |
+| Base de afiliados | 09 | Dirección y Comercial | Altas, retiros y neto acumulado de 24 meses; composición por tipo, tamaño, sector y ciudad; tabla nivel × tipo y exportación; ✦ SARIMA de altas a dic-2027 y ✦ proyección de vigentes con rangos |
+| Afiliados | 02 | Comercial | Directorio filtrable y ordenado por riesgo; ✦ probabilidad de renovar, ✦ perfil (con filtro) y, en no afiliados, ✦ parecido con afiliadas; vista rápida y acceso a la ficha; exportación CSV |
+| Ficha 360° | 03 | Ejecutivas | Índice de salud, componentes del riesgo, **valor recibido del nivel** (beneficios usados, disponibles y sin registro), historial, personas, encuestas, acciones sugeridas, **extracto de valor** descargable y panel **✦ Apoyo de IA** (probabilidad y factores, siguiente paso, perfil, recomendaciones y empresas parecidas) |
+| Renovación y retención | 04 | Comercial y Dirección | Calendario de renovaciones a 30, 60 y 90 días, **extractos de valor en ZIP** para la campaña, tasa de renovación filtrable, mapa de vencimientos por ejecutiva y mes, retención y seguimiento por ejecutiva; ✦ orden por probabilidad de renovar y siguiente paso |
+| Experiencias y NPS | 05 | Experiencias | Participación por línea, modalidad y cargo; tabla de eventos; satisfacción por aspecto; distribución del NPS; **NPS de ACTHO** (encuesta de 90 días, intención de renovar, lista por encuestar); ✦ temas leídos de todos los comentarios, ✦ gráficos de control de satisfacción y NPS, y comentarios |
+| Pulso | 06 | Dirección | Alertas y nuevos rojos (desde `historial`), factores asociados a la retención y **simulador de criterios** del semáforo; ✦ factores del modelo de renovación y comparación semáforo vs. modelo |
+| Planeación de eventos | — | Experiencias | ✦ Simulador: inscritos esperados con rango, % de afiliados, cargos y satisfacción a partir de los eventos parecidos; revisión de la fecha (fines de semana, choques, ola de renovaciones del mes); demanda frente a oferta del tema; convocatoria con quienes autorizaron datos; planes guardados en `historial.plan_evento` y comparados con lo real |
+| Segmentos | — | Comunicaciones | Los segmentos del reto más «Encuesta de 90 días por enviar», con personas contactables (Ley 1581) y exportación; ✦ listas por perfil, por interés en un tema y de no afiliadas parecidas a las afiliadas |
+| Datos y calidad | 07 | Datos | Cargas de Airflow, diagnóstico de calidad, completitud del CRM, **definiciones de los indicadores** para acordar con ACTHO, **conciliación con Zoho**, **cobertura del uso de beneficios** y plantilla mensual, ✦ **fichas de los modelos de IA**, ✦ cruces por revisar, diccionario y recomendaciones de captura |
 
 **Filtros globales** (barra blanca sobre el contenido, se mantienen al cambiar de página): periodo, nivel 2027, tipo de afiliado, sector, ciudad y ejecutiva, como pide el reto. No aparecen en Ficha 360° ni en Datos y calidad.
 
@@ -1118,9 +1126,31 @@ docker compose up -d postgres tablero
 
 **Extracto de valor.** Página HTML autocontenida por afiliado (se imprime o guarda como PDF) con lo que usó en 12 meses, las experiencias de su equipo, los beneficios de su nivel usados y pendientes, su voz en las encuestas y sugerencias. No incluye datos personales (`extracto.py`).
 
-**Pendiente:** consultas en lenguaje natural con IA (wireframe 06). El tablero deja el espacio señalado; el asistente solo podrá leer las vistas, con datos seudonimizados.
+**Pendiente:** consultas en lenguaje natural con un modelo de lenguaje (wireframe 06). El asistente solo podrá leer las vistas, con datos seudonimizados.
 
-### 7.11 Camino hacia la arquitectura objetivo
+### 7.11 Modelos de apoyo de IA
+
+`src/modelos_ia.py` entrena todos los modelos en unos 15 segundos y escribe sus resultados en el esquema `ia` de PostgreSQL (se reemplaza tabla por tabla, así el tablero nunca la ve a medias). El tablero solo lee esas tablas. Se entrenan al final de `setup.py` y en el DAG `actho_recalculo_riesgo_diario` (tarea `entrenar_modelos`), cuando cambian los datos o la fecha de corte. A mano: `python src/modelos_ia.py` o `python src/ingesta_control.py modelos`.
+
+En lugar de una pestaña de IA aparte, cada resultado aparece donde se toma la decisión y lleva el chip **✦ IA**. Las fichas completas (objetivo, método, datos, métrica, línea base y limitaciones) están en *Datos y calidad → Modelos de IA* (`ia.modelo`).
+
+| Modelo | Método | Resultado (corte 23/11/2026) | Dónde se ve |
+| --- | --- | --- | --- |
+| Probabilidad de renovar | Regresión logística en dos etapas: rasgos de la empresa con las 503 empresas con desenlace (375 renovaron, 128 no) y un ajuste por conducta con las 162 cuya ventana previa cae en el registro de asistencia | AUC 0,82 (validación cruzada 5×10); 0,78 sin las variables del CRM que podrían reflejar la cancelación; Brier 0,132 frente a 0,190 | Ficha 360°, Afiliados, Renovación, Pulso, Dashboard |
+| Perfiles de afiliadas | k-means sobre 14 rasgos de uso de 12 meses; k por silueta | 6 perfiles, silueta 0,36 | Afiliados, Ficha 360°, Segmentos |
+| Parecido con afiliadas | Bosque aleatorio afiliadas vs. no afiliadas por su forma de participar (sin costo ni marca de afiliado) | AUC 0,90; no es probabilidad de compra | Afiliados, Segmentos, Ficha 360° |
+| Temas | TF-IDF (caracteres y palabras) contra la descripción de los 12 temas de la encuesta 2026; correcciones a mano por evento en `src/recursos/temas_eventos.csv` | 93 % de aciertos en 70 textos etiquetados a mano (26 % asignando siempre el tema más común) | Experiencias, Planeación, Segmentos |
+| Cruces de identidad | Empresa con la que más asistió cada persona (por `persona_id`) | 97 % de acuerdo con los cruces exactos por correo; 99 personas en varias empresas para revisar | Datos y calidad |
+| Recomendador y siguiente paso | Beneficios del nivel sin usar, temas más vistos por su perfil y reglas sobre vencimiento, uso y probabilidad | 98 % de las vigentes con al menos una recomendación | Ficha 360°, Renovación, extracto de valor |
+| Simulador de eventos | 5 eventos más parecidos (modalidad, línea, tema, experiencia, costo, mes, día); rango con los errores dejando un evento fuera | Error mediano 12 inscritos (17 con la mediana de la modalidad); el rango de 80 % contuvo el real en 76 % de los eventos | Planeación de eventos |
+| Altas mensuales | SARIMA elegido por AIC entre 32 combinaciones (ene-2019 a oct-2026) | Error medio 3,3 altas/mes en los últimos 12 meses, igual que «mismo mes del año anterior» (3,2): se usa como referencia, no como meta | Base de afiliados |
+| Vigentes a dic-2027 | 2.000 escenarios: cada vigente renueva según su probabilidad y se suman las altas del SARIMA | 444 vigentes (80 %: 423 a 465) | Base de afiliados, Dashboard |
+| Gráficos de control | ±3 errores estándar por evento (satisfacción) y por mes (NPS) | 0 puntos fuera de control | Experiencias y NPS |
+| ARIMA de inscripciones y retiros | ARIMA(1,0,1), solo con 24 meses o más | En espera: hay 10 y 23 meses | Se activa solo |
+
+**Límites honestos.** La asistencia solo existe desde enero de 2026, así que la conducta previa de muchas renovaciones no se observa. Por eso la conducta se estima aparte, con las empresas que sí la tienen. Los datos están anonimizados (sin nombres ni correos), así que los cruces de identidad solo usan `persona_id`. Los temas se leen con TF-IDF, no con un modelo de lenguaje: las palabras semilla se escribieron mirando una muestra, así que el 93 % puede ser optimista. Ningún modelo decide por la ejecutiva: ordenan y explican.
+
+### 7.12 Camino hacia la arquitectura objetivo
 
 | Hoy (esquema `actho`) | Arquitectura objetivo (sección 6) |
 | --- | --- |

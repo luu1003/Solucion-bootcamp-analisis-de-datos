@@ -8,6 +8,7 @@ import streamlit as st
 
 import comun as c
 import extracto
+import ia
 
 
 @st.cache_data(ttl=300, show_spinner="Generando los extractos de valor…")
@@ -18,14 +19,18 @@ def _zip_extractos(ids: tuple, corte: str) -> bytes:
     a = c.asistencia()
     r = c.encuestas()
     return extracto.zip_extractos(sel, u[u["empresa_id"].isin(ids)], a[a["empresa_id"].isin(ids)],
-                                  r[r["empresa_id"].isin(ids)], c.catalogo(), corte)
+                                  r[r["empresa_id"].isin(ids)], c.catalogo(), corte, ia.t("recomendacion"))
 
 c.encabezado("Renovación y retención", "Quién vence, quién está en riesgo y en qué cartera, a tiempo para actuar")
 
 p = c.parametros()
 corte = pd.Timestamp(p["fecha_corte"])
 todas = c.filtrar_empresas(c.empresas())
-vig = todas[todas["es_vigente"] == 1].copy()
+vig = ia.con_ia(todas[todas["es_vigente"] == 1])
+if "p_renovar" not in vig:
+    vig["p_renovar"] = None
+acc = ia.t("accion")
+vig = vig.merge(acc, on="empresa_id", how="left") if len(acc) else vig.assign(accion=None)
 
 ventana = st.segmented_control("Ventana de vencimiento", [30, 60, 90], default=90, key="ren_ventana",
                                format_func=lambda d: f"Próximos {d} días") if hasattr(st, "segmented_control") else \
@@ -51,16 +56,23 @@ c.kpi(k[4], "Retiros", c.fmt(renov["no_renovo"]), "No renovaron en 12 meses",
 izq, der = st.columns([2.3, 1], gap="medium")
 with izq:
     with c.tarjeta():
-        c.cabeza("Calendario de renovaciones", f"{c.fmt(len(prox))} empresas por contactar · ordenadas por riesgo")
-        lista = prox.sort_values(["puntaje_riesgo", "dias_a_vencer"], ascending=[False, True])[
-            ["empresa_id", "semaforo", "ejecutiva", "nivel_2027", "fecha_expiracion", "dias_a_vencer",
-             "inscripciones_12m", "satisfaccion_promedio", "motivos_riesgo"]].copy()
+        c.cabeza("Calendario de renovaciones", f"{c.fmt(len(prox))} empresas por contactar · primero las de mayor prioridad")
+        orden_ia = prox["p_renovar"].notna().any() and st.toggle(
+            "Ordenar por probabilidad de renovar (✦ IA), de menor a mayor", value=True, key="ren_orden_ia",
+            help="Apagado, se ordena por el semáforo de riesgo y la cercanía del vencimiento")
+        prox_o = (prox.sort_values(["p_renovar", "dias_a_vencer"]) if orden_ia
+                  else prox.sort_values(["puntaje_riesgo", "dias_a_vencer"], ascending=[False, True]))
+        lista = prox_o[["empresa_id", "semaforo", "p_renovar", "ejecutiva", "nivel_2027", "fecha_expiracion", "dias_a_vencer",
+                        "inscripciones_12m", "satisfaccion_promedio", "accion", "motivos_riesgo"]].copy()
         lista["satisfaccion_promedio"] = lista["satisfaccion_promedio"].map(lambda v: c.fmt(v, 2))
         lista["semaforo"] = lista["semaforo"].map(c.SEM_TXT).fillna("Sin evaluar")
         sel = c.tabla_df(lista, height=min(330, 36 * (len(lista) + 1) + 4), on_select="rerun", selection_mode="single-row",
                          key="ren_tabla",
                          column_config={
                              "empresa_id": "Empresa", "semaforo": "Riesgo", "ejecutiva": "Ejecutiva",
+                             "p_renovar": st.column_config.ProgressColumn("✦ Prob. renovar", min_value=0, max_value=1,
+                                                                          format="percent", width="small"),
+                             "accion": st.column_config.TextColumn("✦ Siguiente paso", width="medium"),
                              "nivel_2027": st.column_config.TextColumn("Nivel", width="small"),
                              "fecha_expiracion": st.column_config.DateColumn("Vence", format="DD/MM/YYYY"),
                              "dias_a_vencer": st.column_config.NumberColumn("Días", format="%d"),
@@ -76,6 +88,9 @@ with izq:
                                file_name=f"extractos_valor_{ventana}_dias.zip", mime="application/zip",
                                icon=":material/folder_zip:", key="ren_zip",
                                help="Un extracto por empresa de la lista, para llevar a la conversación de renovación")
+        if prox["p_renovar"].notna().any():
+            ia.nota("renovacion", f"se esperan ≈{c.fmt(prox['p_renovar'].sum())} renovaciones de las "
+                                  f"{c.fmt(prox['p_renovar'].notna().sum())} de la lista")
         filas = sel.selection.rows if sel is not None and hasattr(sel, "selection") else []
         if filas and b3.button("Abrir ficha 360°", **c.ancho(st.button)):
             c.ir("03_ficha_360.py", lista.iloc[filas[0]]["empresa_id"])
@@ -159,7 +174,13 @@ with der, c.panel("Retención", "Qué se asocia con quedarse"):
         fig.update_yaxes(title="", autorange="reversed")
         c.grafico(fig, 250, "% que sigue vigente · asistencias en 12 meses · toda la base")
     hist = c.tabla("v_movimientos_mensuales", "historial") if c.existe("historial.v_movimientos_mensuales") else pd.DataFrame()
-    items = [
+    items = []
+    coef = ia.t("renovacion_coef")
+    if len(coef):
+        top = coef.head(4)
+        items.append("<b>✦ Lo que más pesa en el modelo</b><br><span>" + " · ".join(
+            f"{r.etiqueta} ({'+' if r.coeficiente > 0 else '−'})" for r in top.itertuples()) + "</span>")
+    items += [
         "<b>Motivos de no renovación</b><br><span>El CRM no registra el motivo del retiro. Se propone capturarlo "
         "con una lista cerrada al cancelar (ver Datos y calidad).</span>",
         ("<b>Renovaciones medidas</b><br><span>" +

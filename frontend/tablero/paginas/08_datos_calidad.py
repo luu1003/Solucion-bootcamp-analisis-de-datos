@@ -5,6 +5,7 @@ import plotly.express as px
 import streamlit as st
 
 import comun as c
+import ia
 
 
 @st.cache_data(show_spinner=False)
@@ -171,6 +172,41 @@ with izq:
                                file_name="uso_beneficios.xlsx", icon=":material/download:", key="dl_plantilla",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                help="Llénala cada mes y guárdala en Datos/8. Uso de beneficios/uso_beneficios.xlsx")
+
+    with c.tarjeta("Modelos de IA", "✦ Qué hace cada modelo, con qué datos, qué tan bien funciona y sus límites"):
+        fichas = ia.t("modelo")
+        if fichas.empty:
+            ia.sin_modelos()
+        else:
+            st.caption(f"Entrenados el {fichas['entrenado'].iloc[0].replace('T', ' a las ')} con corte "
+                       f"{fichas['fecha_corte'].iloc[0]}. Se reentrenan solos cuando cambian los datos o la fecha de corte.")
+            filas = []
+            for f in fichas.itertuples():
+                dec = 0 if f.valor is not None and abs(f.valor) >= 10 else 2
+                filas.append({"n": f.nombre, "p": f.pestanas, "m": f.metrica, "v": ia._num(f.valor, dec),
+                              "e": c.chip(f.estado if len(f.estado) < 12 else "En espera",
+                                          "OK" if f.estado == "Activo" else "Alerta")})
+            c.tabla_html(filas, [("Modelo", ("n", "p"), "texto"), ("Métrica", "m", "texto"), ("Valor", "v", "num"),
+                                 ("Estado", "e", "html")])
+            for f in fichas.itertuples():
+                with st.expander(f"{f.nombre}"):
+                    st.markdown(f"**Para qué:** {f.objetivo}  \n**Método:** {f.metodo}  \n**Datos:** {f.datos}  \n"
+                                f"**Resultado:** {f.metrica} = {ia._num(f.valor, 3)}. {f.linea_base}  \n"
+                                f"**Límites:** {f.limitaciones}  \n**Estado:** {f.estado}  \n**Dónde se ve:** {f.pestanas}")
+
+    ident = ia.t("identidad")
+    if len(ident):
+        with c.tarjeta("Cruces por revisar", "✦ Personas y empresas que el modelo de identidad sugiere corregir"):
+            k = c.fila(2)
+            c.kpi(k[0], "Encuestas con empresa sugerida", c.fmt(ident["respuesta_id"].notna().sum()),
+                  "La empresa se completó o corrigió con la asistencia de esa persona", chip_=("IA", "Identidad"))
+            c.kpi(k[1], "Personas en varias empresas", c.fmt(ident["respuesta_id"].isna().sum()),
+                  "Cambio de empleo o error de digitación: revisar en Zoho")
+            c.tabla_df(ident.rename(columns={"respuesta_id": "Respuesta", "persona_id": "Persona",
+                                             "empresa_actual": "Empresa(s) actual(es)", "empresa_sugerida": "Sugerida",
+                                             "tipo_cruce": "Cruce", "motivo": "Motivo", "confianza": "Confianza"}), height=260)
+            c.descargar(ident, "cruces_por_revisar.csv", "Exportar cruces por revisar")
+            ia.nota("identidad")
 
     with st.expander("Diccionario de datos"):
         c.tabla_df(dic, height=400)

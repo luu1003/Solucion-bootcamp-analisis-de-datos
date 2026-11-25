@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 """05 · Experiencias y NPS: participación por línea y formato, satisfacción y lo que piden los afiliados."""
+import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 import comun as c
+import ia
 
 c.encabezado("Experiencias y NPS", "Qué eventos, líneas y formatos convocan más, a quién y con qué satisfacción")
 
@@ -169,8 +172,44 @@ with izq:
                                           "dias_a_vencer": st.column_config.NumberColumn("Días a vencer", format="%d")})
                 c.descargar(pe, "encuesta_90_dias_por_enviar.csv", "Exportar lista")
 
+    ctrl = ia.t("control")
+    if len(ctrl):
+        with c.tarjeta("¿Algo se salió de lo normal?", "✦ Gráficos de control: puntos fuera de los límites merecen revisión"):
+            t1, t2 = st.tabs(["Satisfacción por evento", "NPS por mes"])
+            for tab_, serie, eje, fmt_ in ((t1, "satisfaccion_evento", "Satisfacción (1 a 5)", ".2f"),
+                                           (t2, "nps_mensual", "NPS", ".0f")):
+                d = ctrl[ctrl["serie"] == serie].copy()
+                d["periodo"] = pd.to_datetime(d["periodo"])
+                d = d.sort_values("periodo")
+                with tab_:
+                    if d.empty:
+                        st.caption("Sin suficientes respuestas.")
+                        continue
+                    fig = go.Figure()
+                    fig.add_scatter(x=d["periodo"], y=d["lcs"], mode="lines", line=dict(color=c.C["lavanda_graf"], dash="dot", shape="hv"),
+                                    name="Límite superior", hoverinfo="skip")
+                    fig.add_scatter(x=d["periodo"], y=d["lci"], mode="lines", line=dict(color=c.C["lavanda_graf"], dash="dot", shape="hv"),
+                                    name="Límite inferior", fill="tonexty", fillcolor="rgba(239,230,255,.45)", hoverinfo="skip")
+                    fig.add_hline(y=d["centro"].iloc[0], line=dict(color=c.C["gris"], width=1),
+                                  annotation_text=f"Promedio {d['centro'].iloc[0]:{fmt_}}", annotation_position="top left")
+                    fuera = d["fuera"].fillna("") != ""
+                    fig.add_scatter(x=d["periodo"], y=d["valor"], mode="lines+markers", name="Valor",
+                                    line=dict(color=c.C["morado"], width=2),
+                                    marker=dict(size=[12 if f_ else 8 for f_ in fuera],
+                                                color=[c.C["naranja"] if f_ else c.C["morado"] for f_ in fuera]),
+                                    customdata=np.c_[d["etiqueta"].astype(str).str[:70], d["n"]],
+                                    hovertemplate="%{customdata[0]}<br><b>%{y:" + fmt_ + "}</b> · %{customdata[1]} respuestas<extra></extra>")
+                    fig.update_yaxes(title=eje)
+                    fig.update_xaxes(title="")
+                    c.grafico(fig, 280, f"{c.fmt(fuera.sum())} fuera de control · el ancho de la banda depende de cuántas respuestas tuvo cada punto")
+            ia.nota("control")
+
 with der, c.panel():
     temas = c.tabla("v_temas_solicitados")
+    dem = ia.t("tema_demanda")
+    if len(dem):   # con IA: los 12 temas leídos de todos los comentarios, no solo de la encuesta estructurada
+        temas = dem[dem["solicitudes"] > 0].rename(columns={"solicitudes": "menciones"})[["tema", "menciones"]]
+        temas = temas.sort_values("menciones", ascending=False)
     temas["tema_completo"] = temas["tema"]
     temas["tema"] = temas["tema"].map(lambda t: c.partir(t, 22))
     with c.tarjeta():
@@ -181,7 +220,7 @@ with der, c.panel():
         fig.update_yaxes(title="")
         fig.update_xaxes(title="")
         fig.update_layout(bargap=0.3)
-        c.grafico(fig, 380, "Temas para próximos espacios")
+        c.grafico(fig, 380, "Temas para próximos espacios" + (" · ✦ leídos con IA de todos los comentarios" if len(dem) else ""))
     gusto = r["lo_que_gusto"].dropna()
     gusto = gusto[gusto.str.len() > 15]
     mejora = r["a_mejorar"].dropna()

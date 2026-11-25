@@ -185,60 +185,98 @@ def _rasgos_renovacion(base: pd.DataFrame, asis: pd.DataFrame, ref_col: str) -> 
     return X
 
 
-def modelo_renovacion(d: dict, corte: pd.Timestamp) -> dict:
+ESTATICAS = ["antiguedad", "tam_grande", "tam_mediana", "tam_peq", "tam_sd", "tipo_consultora", "tipo_persona",
+             "premium", "reg_bogota", "reg_antioquia", "comunidades"]
+CONDUCTA = ["participacion", "sin_participacion"]
+
+
+def _ajustar_renovacion(X, y, C=0.5, estaticas=None):
+    """Dos etapas para no confundir 'tener asistencia observable' con 'no renovar':
+    1) logística con rasgos estáticos sobre todas las empresas con desenlace;
+    2) ajuste por conducta (inscripciones en los 6 meses previos) solo con las empresas cuya ventana previa
+       cae dentro del registro de asistencia, usando la etapa 1 como desplazamiento (offset)."""
+    import statsmodels.api as sm
     from sklearn.linear_model import LogisticRegression
-    from sklearn.metrics import brier_score_loss, roc_auc_score
-    from sklearn.model_selection import RepeatedStratifiedKFold, cross_val_predict, StratifiedKFold
-    from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler
+    est = estaticas or ESTATICAS
+    sc = StandardScaler().fit(X[est])
+    lr = LogisticRegression(C=C, max_iter=2000).fit(sc.transform(X[est]), y)
+    logit_s = lr.decision_function(sc.transform(X[est]))
+    obs = (X["exposicion"] >= 1).values
+    B = X.loc[obs, CONDUCTA]
+    glm = sm.GLM(y[obs], B, family=sm.families.Binomial(), offset=logit_s[obs]).fit_regularized(alpha=0.02, L1_wt=0)
+    return {"sc": sc, "lr": lr, "beta": np.asarray(glm.params), "n_obs": int(obs.sum()), "est": est}
+
+
+def _predecir_renovacion(m, X, con_conducta=True):
+    z = m["sc"].transform(X[m["est"]])
+    logit = m["lr"].decision_function(z)
+    if con_conducta:
+        logit = logit + np.where((X["exposicion"] >= 1).values, X[CONDUCTA].values @ m["beta"], 0)
+    return 1 / (1 + np.exp(-logit))
+
+
+def modelo_renovacion(d: dict, corte: pd.Timestamp) -> dict:
+    from sklearn.metrics import brier_score_loss, roc_auc_score
+    from sklearn.model_selection import RepeatedStratifiedKFold
 
     e = d["e360"]
-    etq = e[e["renovacion_aprox"].notna()].copy()
+    etq = e[e["renovacion_aprox"].notna()].copy().reset_index(drop=True)
     etq["y"] = (etq["renovacion_aprox"] == "Renovó").astype(int)
     # Fecha de referencia: cuándo se decidió la renovación
     venc = etq["fecha_expiracion"]
-    etq["ref"] = np.where(etq["y"] == 1, venc - pd.DateOffset(years=1), venc)
-    etq["ref"] = pd.to_datetime(etq["ref"]).fillna(corte - pd.Timedelta(days=365)).clip(upper=corte)
-    X = _rasgos_renovacion(etq.reset_index(drop=True), d["asis"], "ref")
+    etq["ref"] = pd.to_datetime(np.where(etq["y"] == 1, venc - pd.DateOffset(years=1), venc))
+    etq["ref"] = etq["ref"].fillna(corte - pd.Timedelta(days=365)).clip(upper=corte)
+    X = _rasgos_renovacion(etq, d["asis"], "ref")
     y = etq["y"].values
-
-    def pipe():
-        return make_pipeline(StandardScaler(), LogisticRegression(C=0.5, max_iter=2000))
+    obs = (X["exposicion"] >= 1).values
 
     cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=SEMILLA)
-    aucs, aucs_sin_crm = [], []
-    cols_sin_crm = [c for c in X.columns if c not in ("tam_sd", "comunidades")]
-    for tr, te in cv.split(X, y):
-        m = pipe().fit(X.iloc[tr], y[tr])
-        aucs.append(roc_auc_score(y[te], m.predict_proba(X.iloc[te])[:, 1]))
-        m2 = pipe().fit(X.iloc[tr][cols_sin_crm], y[tr])
-        aucs_sin_crm.append(roc_auc_score(y[te], m2.predict_proba(X.iloc[te][cols_sin_crm])[:, 1]))
-    p_cv = cross_val_predict(pipe(), X, y, cv=StratifiedKFold(5, shuffle=True, random_state=SEMILLA),
-                             method="predict_proba")[:, 1]
-    brier = brier_score_loss(y, p_cv)
+    aucs, aucs_est, aucs_obs, aucs_sin_crm = [], [], [], []
+    p_oof = np.zeros(len(y))
+    sin_crm = [c for c in ESTATICAS if c not in ("tam_sd", "comunidades")]
+    for i, (tr, te) in enumerate(cv.split(X, y)):
+        m = _ajustar_renovacion(X.iloc[tr], y[tr])
+        p = _predecir_renovacion(m, X.iloc[te])
+        aucs.append(roc_auc_score(y[te], p))
+        aucs_est.append(roc_auc_score(y[te], _predecir_renovacion(m, X.iloc[te], False)))
+        o = obs[te]
+        if o.sum() > 5 and len(set(y[te][o])) > 1:
+            aucs_obs.append(roc_auc_score(y[te][o], p[o]))
+        if i < 5:
+            p_oof[te] = p
+        m2 = _ajustar_renovacion(X.iloc[tr], y[tr], estaticas=sin_crm)
+        aucs_sin_crm.append(roc_auc_score(y[te], _predecir_renovacion(m2, X.iloc[te])))
+    brier = brier_score_loss(y, p_oof)
     brier_base = brier_score_loss(y, np.full(len(y), y.mean()))
-    con_expo = (X["exposicion"] >= 2).values
-    auc_expo = roc_auc_score(y[con_expo], p_cv[con_expo]) if con_expo.sum() > 20 and len(set(y[con_expo])) > 1 else None
 
-    modelo = pipe().fit(X, y)
-    sc, lr = modelo.named_steps["standardscaler"], modelo.named_steps["logisticregression"]
-    coef = pd.DataFrame({"variable": X.columns, "etiqueta": [ETIQUETAS_RENOV[c] for c in X.columns],
-                         "coeficiente": lr.coef_[0], "razon_momios": np.exp(lr.coef_[0])})
+    modelo = _ajustar_renovacion(X, y)
+    sc, lr, beta = modelo["sc"], modelo["lr"], modelo["beta"]
+    coef = pd.DataFrame({"variable": ESTATICAS + CONDUCTA,
+                         "etiqueta": [ETIQUETAS_RENOV[c] for c in ESTATICAS + CONDUCTA],
+                         "coeficiente": np.r_[lr.coef_[0], beta * X.loc[obs, CONDUCTA].std().values],
+                         "etapa": ["Rasgos de la empresa"] * len(ESTATICAS) + ["Conducta reciente"] * len(CONDUCTA)})
+    coef["razon_momios"] = np.exp(coef["coeficiente"])
     coef = coef.reindex(coef["coeficiente"].abs().sort_values(ascending=False).index)
 
-    # Puntuar la cartera vigente hoy
+    # Puntuar la cartera vigente hoy (todas con 6 meses de asistencia observable)
     vig = e[(e["es_vigente"] == 1) & (e["en_crm"] == 1)].copy().reset_index(drop=True)
     vig["ref"] = corte
     Xv = _rasgos_renovacion(vig, d["asis"], "ref")
-    p = modelo.predict_proba(Xv)[:, 1]
-    z = sc.transform(Xv)
-    contrib = pd.DataFrame(z * lr.coef_[0], columns=X.columns)
+    p = _predecir_renovacion(modelo, Xv)
+    contrib = pd.DataFrame(sc.transform(Xv[ESTATICAS]) * lr.coef_[0], columns=ESTATICAS)
+    media_obs = X.loc[obs, CONDUCTA].mean()
+    for j, c in enumerate(CONDUCTA):
+        contrib[c] = (Xv[c] - media_obs[c]).values * beta[j]
     filas_f, tops = [], []
     for i, emp in enumerate(vig["empresa_id"]):
         c = contrib.iloc[i]
+        visibles = [k for k in c.index if k == "antiguedad" or (k == "participacion" and Xv.iloc[i][k] > 0)
+                    or (k != "participacion" and Xv.iloc[i][k] == 1)]
+        c = c[visibles]
         c = c[c.abs() > 0.05].sort_values()
-        neg = [ETIQUETAS_RENOV[k] for k in c.index[:3] if c[k] < 0]
-        pos = [ETIQUETAS_RENOV[k] for k in c.index[::-1][:3] if c[k] > 0]
+        neg = [_txt_factor(k, Xv.iloc[i][k]) for k in c.index[:3] if c[k] < 0]
+        pos = [_txt_factor(k, Xv.iloc[i][k]) for k in c.index[::-1][:3] if c[k] > 0]
         tops.append((" · ".join(pos), " · ".join(neg)))
         for k, v in c.items():
             filas_f.append({"empresa_id": emp, "factor": ETIQUETAS_RENOV[k], "efecto": round(float(v), 3),
@@ -249,21 +287,35 @@ def modelo_renovacion(d: dict, corte: pd.Timestamp) -> dict:
                           "semaforo": vig["semaforo"], "fecha_expiracion": vig["fecha_expiracion"]})
     ficha("renovacion", "Probabilidad de renovar", "Ficha 360°, Afiliados, Renovación, Pulso",
           "Ordenar la cartera vigente por probabilidad de renovar y explicar por qué",
-          "Regresión logística con variables estandarizadas; factores = aporte de cada variable al puntaje",
+          "Regresión logística en dos etapas: rasgos de la empresa con todas las empresas con desenlace, y un "
+          f"ajuste por conducta reciente con las {modelo['n_obs']} cuya ventana previa cae en el registro de "
+          "asistencia. Factores = aporte de cada variable al puntaje.",
           f"{len(etq)} empresas con desenlace conocido en los últimos 12 meses ({int(y.sum())} renovaron, "
           f"{int(len(y) - y.sum())} no). Comportamiento medido solo antes de su fecha de referencia.",
           len(etq), "AUC (validación cruzada 5×10)", np.mean(aucs),
-          f"Azar = 0,50. Brier {brier:.3f} frente a {brier_base:.3f} prediciendo siempre la tasa promedio.",
-          "La asistencia solo existe desde ene-2026: muchas empresas que renovaron a fin de 2025 no tienen "
-          "comportamiento previo observable (se controla con 'Meses con asistencia observable'). "
-          "Tamaño sin dato y comunidades vienen del CRM actual y pueden reflejar en parte la cancelación: "
-          f"sin esas dos variables el AUC es {np.mean(aucs_sin_crm):.2f}. Es una herramienta para ordenar "
-          "la cartera, no una sentencia: la ejecutiva siempre decide.",
-          extra={"auc_std": float(np.std(aucs)), "auc_sin_variables_crm": float(np.mean(aucs_sin_crm)),
-                 "auc_con_exposicion": auc_expo, "n_con_exposicion": int(con_expo.sum()),
-                 "brier": brier, "brier_base": brier_base, "tasa_base": float(y.mean()),
-                 "puntuadas": len(vig), "p_media_cartera": float(p.mean())})
+          f"Azar = 0,50. Solo rasgos de la empresa: {np.mean(aucs_est):.2f}. En empresas con conducta observable: "
+          f"{np.mean(aucs_obs):.2f}. Brier {brier:.3f} frente a {brier_base:.3f} con la tasa promedio.",
+          "La asistencia solo existe desde ene-2026: las que renovaron a fin de 2025 no tienen conducta previa "
+          "observable, por eso la conducta se estima aparte con las que sí. 'Tamaño sin dato' y 'comunidades' "
+          "vienen del CRM actual y pueden reflejar en parte la cancelación: sin ellas el AUC es "
+          f"{np.mean(aucs_sin_crm):.2f}. Sirve para ordenar la cartera, no para decidir por la ejecutiva.",
+          extra={"auc_std": float(np.std(aucs)), "auc_solo_estaticas": float(np.mean(aucs_est)),
+                 "auc_observables": float(np.mean(aucs_obs)), "auc_sin_variables_crm": float(np.mean(aucs_sin_crm)),
+                 "n_observables": modelo["n_obs"], "brier": brier, "brier_base": brier_base,
+                 "tasa_base": float(y.mean()), "puntuadas": len(vig), "p_media_cartera": float(p.mean())})
     return {"score": score, "factores": pd.DataFrame(filas_f), "coef": coef}
+
+
+def _txt_factor(k, v):
+    if k == "participacion":
+        n = int(round(np.expm1(v)))
+        return f"{n} inscripciones en 6 meses"
+    if k == "antiguedad":
+        n = int(round(v))
+        return "Menos de un año como afiliada" if n < 1 else f"{n} año{'s' if n != 1 else ''} como afiliada"
+    if k == "sin_participacion":
+        return "Ningún evento en 6 meses"
+    return ETIQUETAS_RENOV[k]
 
 
 def _valor_factor(k, v):
@@ -450,7 +502,8 @@ SEMILLAS_TEMA = {
         "desempeño evaluación de desempeño feedback retroalimentación objetivos productividad resultados metas "
         "top talents",
     "Seguridad y salud en el trabajo (SST)":
-        "seguridad y salud en el trabajo sst riesgos laborales accidentes arl prevención",
+        "sst sg-sst seguridad industrial accidentalidad accidentes de trabajo arl ergonomía higiene industrial "
+        "copasst brigadas emergencias",
     "Atracción, selección y marca empleadora":
         "selección reclutamiento atracción marca empleadora contratación talento vacantes procesos de selección",
 }
@@ -538,6 +591,13 @@ def modelo_temas(d: dict) -> dict:
     ev["tema"] = rev["tema"].values
     ev.loc[ev["tema"] == SIN_TEMA, "tema"] = "General / tendencias"
     ev["similitud_tema"] = rev["similitud"].values
+    ev["origen_tema"] = "Modelo (TF-IDF)"
+    # Correcciones a mano (las mantiene el equipo de ACTHO en src/recursos/temas_eventos.csv)
+    ruta = RAIZ / "src" / "recursos" / "temas_eventos.csv"
+    if ruta.exists():
+        for _, c in pd.read_csv(ruta).iterrows():
+            m = ev["nombre"].str.contains(str(c["nombre_contiene"]), case=False, regex=False, na=False)
+            ev.loc[m, ["tema", "origen_tema"]] = [c["tema"], "Corregido a mano"]
     # Oferta frente a demanda
     sol = solicitudes[solicitudes["tema"] != SIN_TEMA]
     sol = pd.concat([sol[["tema", "encuesta_id"]], sol[sol["tema_2"].notna()][["tema_2", "encuesta_id"]]
@@ -562,7 +622,7 @@ def modelo_temas(d: dict) -> dict:
           "optimista. Un texto puede tocar varios temas: se guarda un segundo tema cuando aplica. Para más "
           "precisión, etiquetar 200 textos más o usar un modelo de lenguaje.",
           extra={"cobertura": float(cobertura), "n_validacion": len(v), "aciertos_top2": float(v["ok"].mean())})
-    return {"textos": solicitudes, "eventos": ev[["evento_id", "tema", "similitud_tema"]], "demanda": dd,
+    return {"textos": solicitudes, "eventos": ev[["evento_id", "tema", "similitud_tema", "origen_tema"]], "demanda": dd,
             "clasificador": clf}
 
 

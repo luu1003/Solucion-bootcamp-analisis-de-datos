@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import comun as c
+import ia
 
 c.encabezado("Base de afiliados", "Cómo se mueve la base mes a mes y cómo está compuesta")
 
@@ -69,6 +70,48 @@ with principal:
                    "estar). Retiros: fecha de expiración de las canceladas, expiradas o inactivas. Desde la segunda foto "
                    "mensual de Airflow, las renovaciones y retiros se miden sin aproximaciones.")
 
+    def banda(fig, d, color, nombre):
+        x = list(d["mes"]) + list(d["mes"])[::-1]
+        for li, ls, alfa, et in (("li95", "ls95", 0.12, "95 %"), ("li80", "ls80", 0.25, "80 %")):
+            if li in d and d[li].notna().any():
+                fig.add_scatter(x=x, y=list(d[ls]) + list(d[li])[::-1], fill="toself", mode="lines", line=dict(width=0),
+                                fillcolor=c._desvanecer(color, alfa), name=f"Rango {et}", hoverinfo="skip")
+        fig.add_scatter(x=d["mes"], y=d["pronostico"], mode="lines+markers", name=nombre,
+                        line=dict(color=color, width=3, dash="dash"), marker=dict(size=5),
+                        hovertemplate="%{x|%b %Y}: <b>%{y:.0f}</b><extra>" + nombre + "</extra>")
+
+    alt = ia.pronostico("altas")
+    vproy = ia.pronostico("vigentes")
+    if len(alt) and len(vproy):
+        g1, g2 = st.columns(2)
+        with g1, c.tarjeta():
+            h = alt[(alt["tipo"] == "historia") & (alt["mes"] >= corte - pd.DateOffset(months=36))]
+            f = alt[alt["tipo"] == "pronostico"]
+            fig = go.Figure()
+            fig.add_bar(x=h["mes"], y=h["real"], name="Altas reales", marker_color=c.C["morado"],
+                        hovertemplate="%{x|%b %Y}: <b>%{y:.0f}</b> altas<extra></extra>")
+            banda(fig, f, c.C["naranja"], "Pronóstico")
+            fig.update_layout(title="Altas por mes: real y pronóstico")
+            fig.update_xaxes(title="")
+            fig.update_yaxes(title="Empresas nuevas", rangemode="tozero")
+            c.grafico(fig, 320, f"Últimos 36 meses y pronóstico a dic-2027 · {c.fmt(f['pronostico'].sum())} altas esperadas")
+            fa_ = ia.ficha("altas")
+            ia.nota("altas", "le gana a la línea base" if fa_.get("detalle", {}).get("gana_linea_base") else
+                    "no le gana a todas las líneas base: úsalo como referencia")
+        with g2, c.tarjeta():
+            fig = go.Figure()
+            fig.add_hline(y=len(vig), line=dict(color=c.C["linea"], dash="dot"),
+                          annotation_text=f"Hoy: {c.fmt(len(vig))}", annotation_position="bottom left")
+            banda(fig, vproy, c.C["morado"], "Vigentes proyectadas")
+            fig.update_layout(title="Afiliadas vigentes proyectadas")
+            fig.update_xaxes(title="")
+            fig.update_yaxes(title="Vigentes")
+            fin = vproy.iloc[-1]
+            c.grafico(fig, 320, f"Dic-2027: {c.fmt(fin['pronostico'])} (80 %: {c.fmt(fin['li80'])} a {c.fmt(fin['ls80'])}) "
+                                "· simulación con la probabilidad de renovar de cada empresa + altas esperadas")
+            ia.nota("vigentes")
+        st.caption("Las proyecciones son de toda la base (no responden a los filtros) y se recalculan con cada carga.")
+
     def composicion(col, dim, titulo, top=None):
         with col, c.tarjeta():
             e_c, _, _ = c.datos(excluir=(dim,))
@@ -124,4 +167,11 @@ with lateral, c.panel():
                      "<span>Históricamente; conviene reforzar la prospección antes de ese mes.</span>")
     items.append(f"<b>Crecimiento neto: {('+' if neto > 0 else '') + c.fmt(neto)} en 12 meses</b><br>"
                  f"<span>{c.fmt(altas12)} altas frente a {c.fmt(retiros12)} retiros.</span>")
+    fv = ia.ficha("vigentes")
+    if fv:
+        d_ = fv["detalle"]
+        items.append(f"<b>✦ Si nada cambia: {c.fmt(fv['valor'])} vigentes a dic-2027</b><br><span>De las "
+                     f"{c.fmt(d_.get('vencen_2026'))} que vencen antes de 2027 se espera que renueve el "
+                     f"{c.fmt(100 * (d_.get('renov_esperada_2026') or 0), 0)} %. Subir la renovación es la palanca "
+                     "más grande del crecimiento.</span>")
     c.pulso(items, "Pulso", "Lo que dice la composición de la base")

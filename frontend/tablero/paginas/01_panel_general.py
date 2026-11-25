@@ -9,6 +9,7 @@ import streamlit as st
 
 import comun as c
 import graficas
+import ia
 import powerbi
 
 
@@ -64,7 +65,13 @@ with principal:
     m1, m2, m3 = c.fila(3)
     tasa = renov["tasa"]
     brecha = c.METAS_2027["renovacion"] - (tasa or 0)
-    c.meta(m1, f"Tasa de renovación ({renov['tipo']})", tasa, c.METAS_2027["renovacion"], renov["nota"],
+    ren_ia = ia.renovacion()
+    proy = None
+    if len(ren_ia):
+        x = ren_ia[ren_ia["empresa_id"].isin(set(vig["empresa_id"]))]
+        x = x[pd.to_datetime(x["fecha_expiracion"]) <= corte + pd.Timedelta(days=365)]
+        proy = 100 * x["p_renovar"].mean() if len(x) else None
+    c.meta(m1, f"Tasa de renovación ({renov['tipo']})", tasa, c.METAS_2027["renovacion"], renov["nota"], proyeccion=proy,
            chip_=("Neutro", "Sin datos") if tasa is None else
            ("Alerta" if brecha > 0 else "OK", f"{c.fmt(brecha, 1)} pts por debajo" if brecha > 0 else "Sobre la meta"),
            ayuda_=c.ayuda("Tasa de renovación (medida)" if renov["tipo"] == "medida" else "Tasa de renovación (aproximada)"))

@@ -326,6 +326,8 @@ def entrenar_modelos(conn, fecha, forzar=False) -> str:
                 return "al día"
         except Exception:  # noqa: BLE001
             pass
+    if os.environ.get("ACTHO_MODELOS") == "segundo_plano":
+        return "pendiente (se entrenan en segundo plano)"
     try:
         import modelos_ia
         r = modelos_ia.entrenar(fecha)

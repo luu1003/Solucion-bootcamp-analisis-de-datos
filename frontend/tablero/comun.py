@@ -61,7 +61,7 @@ MODALIDAD = {"Presencial": C["morado"], "Virtual": C["naranja"], "Híbrido": C["
 LINEA = {"Anticipar": C["morado"], "Evento grande": C["naranja"], "Foro": C["cian_graf"], "Pares": C["lavanda_graf"],
          "Proyectar": C["morado_900"], "Sin línea": C["gris"]}
 SECUENCIA = [C["morado"], C["naranja"], C["cian_graf"], C["lavanda_graf"], C["morado_900"], C["naranja_300"]]
-TONOS = {"OK": "ok", "Alerta": "alerta", "Riesgo": "riesgo", "Morado": "morado", "Neutro": "neutro"}
+TONOS = {"OK": "ok", "Alerta": "alerta", "Riesgo": "riesgo", "Morado": "morado", "Neutro": "neutro", "IA": "ia"}
 
 
 def riesgo_txt(s) -> str:
@@ -180,6 +180,11 @@ div[data-testid="stLayoutWrapper"] > div[data-testid="stVerticalBlock"][class*="
 .chip.riesgo, .chip.rojo {{ background:{C['riesgo_suave']}; color:{C['riesgo']}; }}
 .chip.morado {{ background:{C['lavanda']}; color:{C['morado']}; }}
 .chip.neutro, .chip.gris {{ background:#F1EFF5; color:{C['gris']}; }}
+.chip.ia {{ background:#E3F6FA; color:#075E70; }}
+.chip.ia::before {{ content:'✦ '; }}
+.kpi.oscuro .chip.ia {{ background: rgba(138,230,247,.18); color:{C['cian_claro']}; }}
+.nota-ia {{ font-size:.74rem; color:{C['gris']}; margin:.15rem 0 .4rem; }}
+.nota-ia b {{ color:#075E70; }}
 .kpi.oscuro .chip.morado {{ background: rgba(255,255,255,.16); color:#fff; }}
 
 /* ── Distribución: sin superposiciones ni alturas distintas ── */
@@ -929,13 +934,21 @@ def kpi(col, etiqueta, valor, nota="", oscuro=False, chip_=None, ayuda_=""):
                 f'<div class="va">{valor}</div>{ch}<div class="no">{nota}</div></div>')
 
 
-def meta(col, etiqueta, actual, objetivo, nota="", sufijo="%", chip_=None, ayuda_=""):
+def meta(col, etiqueta, actual, objetivo, nota="", sufijo="%", chip_=None, ayuda_="", proyeccion=None):
+    """proyeccion: valor proyectado por un modelo de IA; se marca sobre la barra con una línea cian."""
     pct = 0 if actual is None or pd.isna(actual) else max(0, min(100, 100 * actual / objetivo))
     ch = chip(chip_[1], chip_[0]) if chip_ else ""
+    marca, txt_p = "", ""
+    if proyeccion is not None and not pd.isna(proyeccion):
+        pp = max(0, min(100, 100 * proyeccion / objetivo))
+        marca = (f'<span title="Proyección IA: {fmt(proyeccion, 1, sufijo)}" style="position:absolute;left:calc({pp:.0f}% - 2px);'
+                 f'top:-4px;bottom:-4px;width:4px;border-radius:2px;background:{C["cian_graf"]}"></span>')
+        txt_p = f'<div class="no" style="color:#075E70">✦ Proyección IA: <b>{fmt(proyeccion, 1, sufijo)}</b></div>'
     _poner(col, f'<div class="meta"><div class="et-meta">{_e(etiqueta)}{_icono_ayuda(ayuda_)}</div>'
                 f'<div class="fila"><span class="va">{fmt(actual, 1, sufijo)}</span>'
                 f'<span class="obj">meta 2027: {fmt(objetivo, 0, sufijo)}</span> {ch}</div>'
-                f'<div class="barra"><div style="width:{pct:.0f}%"></div></div><div class="no">{nota}</div></div>')
+                f'<div class="barra" style="position:relative;overflow:visible"><div style="width:{pct:.0f}%"></div>{marca}</div>'
+                f'<div class="no">{nota}</div>{txt_p}</div>')
 
 
 def cabeza(titulo: str, sub: str | None = None, oscuro=False):

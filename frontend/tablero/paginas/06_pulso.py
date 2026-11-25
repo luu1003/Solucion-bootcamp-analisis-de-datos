@@ -3,9 +3,11 @@
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 import comun as c
+import ia
 
 c.encabezado("Pulso", "Alertas, factores de riesgo y criterios del semáforo para decidir con ACTHO")
 
@@ -75,7 +77,7 @@ with tab2:
                           textfont=dict(color=c.C["tinta"]),
                           hovertemplate="%{x}: <b>%{y:.1f} %</b> vigente · %{customdata[0]} empresas<extra></extra>")
         fig.update_yaxes(range=[0, 118], title="")
-        fig.update_xaxes(title="")
+        fig.update_xaxes(title="", type="category")
         with col:
             with c.tarjeta():
                 c.grafico(fig, 260, sub)
@@ -85,6 +87,41 @@ with tab2:
     barra(g1, crm, "Asistencias 12 meses", "Participación", "% vigente según asistencias en 12 meses")
     barra(g2, crm, "Personas distintas", "Amplitud de la relación", "% vigente según personas que participan")
     barra(g3, crm, "Líneas usadas", "Uso de la oferta", "% vigente según líneas 2027 usadas")
+
+    coef = ia.t("renovacion_coef")
+    ren = ia.renovacion()
+    if len(coef) and len(ren):
+        h1, h2 = st.columns([1.2, 1], gap="medium")
+        with h1, c.tarjeta("Qué pesa en la probabilidad de renovar", "✦ Modelo de IA · efecto de cada factor manteniendo los demás fijos"):
+            d = coef.sort_values("coeficiente")
+            d["Etiqueta"] = d["etiqueta"].map(lambda t_: c.partir(t_, 30))
+            fig = go.Figure(go.Bar(
+                x=d["coeficiente"], y=d["Etiqueta"], orientation="h",
+                marker_color=[c.C["morado"] if v > 0 else c.C["naranja"] for v in d["coeficiente"]],
+                customdata=np.c_[d["razon_momios"].round(2), d["etapa"]],
+                hovertemplate="%{y}<br>Efecto <b>%{x:.2f}</b> · multiplica las chances por %{customdata[0]}"
+                              "<br>%{customdata[1]}<extra></extra>"))
+            fig.add_vline(x=0, line=dict(color=c.C["gris"], width=1))
+            fig.update_xaxes(title="← baja la probabilidad · sube la probabilidad →")
+            c.grafico(fig, 420)
+            ia.nota("renovacion")
+        with h2, c.tarjeta("Semáforo frente al modelo", "Empresas vigentes según las dos miradas"):
+            m = vig.merge(ren[["empresa_id", "banda"]], on="empresa_id")
+            m["Riesgo"] = m["semaforo"].map(c.SEM_TXT)
+            tab = pd.crosstab(m["Riesgo"], m["banda"]).reindex(index=c.ORDEN_RIESGO, columns=ia.ORDEN_BANDA, fill_value=0)
+            fig = go.Figure(go.Heatmap(z=tab.values, x=[f"IA: {b}" for b in tab.columns], y=[f"Semáforo: {r_}" for r_ in tab.index],
+                                       text=tab.values, texttemplate="%{text}", colorscale=[[0, c.C["lavanda"]], [1, c.C["morado"]]],
+                                       showscale=False, hovertemplate="%{y} · %{x}: <b>%{z}</b><extra></extra>",
+                                       textfont=dict(size=14)))
+            fig.update_yaxes(autorange="reversed")
+            c.grafico(fig, 260)
+            ojo = m[(m["semaforo"] == "Verde") & (m["banda"] == "En riesgo")]
+            st.markdown(f'<div class="hallazgo"><div><b>{c.fmt(len(ojo))} empresas con semáforo bajo que el modelo ve en '
+                        'riesgo.</b> El semáforo mira vencimiento, uso reciente y satisfacción; el modelo además pesa '
+                        'antigüedad, tamaño y comunidades. Son las que conviene revisar.</div></div>', unsafe_allow_html=True)
+            if len(ojo):
+                c.descargar(ojo[["empresa_id", "ejecutiva", "nivel_2027", "dias_a_vencer"]], "semaforo_vs_modelo.csv",
+                            "Exportar esas empresas")
 
 with tab3:
     st.markdown("Ajusta los criterios y mira cómo cambiaría el semáforo **antes** de cambiarlo en la base "

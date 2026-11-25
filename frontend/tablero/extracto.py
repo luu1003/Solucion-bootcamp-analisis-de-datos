@@ -85,8 +85,9 @@ CINTA = ('<svg class="cinta" viewBox="0 0 170 300" fill="none" aria-hidden="true
 
 
 def html_extracto(emp: pd.Series, uso: pd.DataFrame, asis: pd.DataFrame, enc: pd.DataFrame,
-                  cat: pd.DataFrame, corte) -> str:
-    """emp: fila de v_empresa_360. uso / asis / enc: filas de esa empresa. cat: dim_servicio."""
+                  cat: pd.DataFrame, corte, recomendaciones: pd.DataFrame | None = None) -> str:
+    """emp: fila de v_empresa_360. uso / asis / enc: filas de esa empresa. cat: dim_servicio.
+    recomendaciones: filas de ia.recomendacion de esa empresa (opcional, las genera src/modelos_ia.py)."""
     corte = pd.Timestamp(corte)
     desde = corte - pd.Timedelta(days=365)
     nivel = emp.get("nivel_2027")
@@ -172,6 +173,15 @@ def html_extracto(emp: pd.Series, uso: pd.DataFrame, asis: pd.DataFrame, enc: pd
     pendientes = sorted([r for r in incluidos.itertuples() if r.servicio_id not in usados],
                         key=lambda r: (r.servicio_id not in medibles, r.servicio_id))[:3]
     sug = [f'<div class="sugerencia"><b>{_e(r.servicio)}</b>: {_e(r.descripcion)}.</div>' for r in pendientes]
+    if recomendaciones is not None and len(recomendaciones):
+        for r in recomendaciones.itertuples():
+            if r.tipo == "Tema que le puede interesar":
+                sug.append(f'<div class="sugerencia"><b>Un tema para tu equipo: {_e(r.recomendacion)}</b>: es de los '
+                           'más aprovechados por empresas con una forma de participar parecida a la tuya y aún no '
+                           'lo has explorado.</div>')
+            elif r.tipo == "Comunidad":
+                sug.append('<div class="sugerencia"><b>Comunidades ACTHO</b>: tu nivel incluye la participación en '
+                           'comunidades de pares; te contamos cuál encaja con tu equipo.</div>')
     if (emp.get("personas_distintas") or 0) <= 1:
         sug.append('<div class="sugerencia"><b>Más personas de tu equipo</b>: la afiliación es de la empresa; '
                    'invita a otros niveles del área de talento humano a las próximas experiencias.</div>')
@@ -202,15 +212,16 @@ def html_extracto(emp: pd.Series, uso: pd.DataFrame, asis: pd.DataFrame, enc: pd
 
 
 def zip_extractos(empresas: pd.DataFrame, uso: pd.DataFrame, asis: pd.DataFrame, enc: pd.DataFrame,
-                  cat: pd.DataFrame, corte) -> bytes:
+                  cat: pd.DataFrame, corte, recomendaciones: pd.DataFrame | None = None) -> bytes:
     """Un HTML por empresa dentro de un ZIP (para la campaña de renovación)."""
     buf = io.BytesIO()
     u_g = dict(tuple(uso.groupby("empresa_id"))) if len(uso) else {}
     a_g = dict(tuple(asis.groupby("empresa_id"))) if len(asis) else {}
     e_g = dict(tuple(enc.groupby("empresa_id"))) if len(enc) else {}
+    r_g = dict(tuple(recomendaciones.groupby("empresa_id"))) if recomendaciones is not None and len(recomendaciones) else {}
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for _, emp in empresas.iterrows():
             i = emp["empresa_id"]
             z.writestr(f"extracto_{i}.html", html_extracto(emp, u_g.get(i, uso.iloc[0:0]), a_g.get(i, asis.iloc[0:0]),
-                                                           e_g.get(i, enc.iloc[0:0]), cat, corte))
+                                                           e_g.get(i, enc.iloc[0:0]), cat, corte, r_g.get(i)))
     return buf.getvalue()

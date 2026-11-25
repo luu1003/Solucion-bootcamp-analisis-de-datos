@@ -42,6 +42,7 @@ SECCIONES = {
     ],
     "Experiencias": [
         ("05_experiencias_nps.py", "Experiencias y NPS", ":material/event:"),
+        ("10_planeacion_eventos.py", "Planeación de eventos", ":material/event_upcoming:"),
         ("07_segmentos.py", "Segmentos", ":material/campaign:"),
     ],
     "Datos": [

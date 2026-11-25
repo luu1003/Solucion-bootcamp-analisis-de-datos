@@ -7,9 +7,9 @@ ACTHO · Tablero integral de afiliados — un solo comando para dejar todo corri
     Windows:        py setup.py
 
 Qué hace (y se salta lo que ya esté listo):
-  1. Verifica Python y crea el entorno virtual .venv (si falta o es de otro equipo).
+  1. Verifica Python y crea el entorno virtual (si falta o no funciona). Vive fuera del proyecto (ver 4).
   2. Instala las librerías de requirements.txt (solo si cambiaron).
-  3. Configura VS Code para usar .venv.
+  3. Configura VS Code para usar ese entorno.
   4. Prepara PostgreSQL sin preguntar nada, en este orden:
        a) la base de .env / DATABASE_URL, si responde;
        b) Docker Desktop (docker compose up -d postgres), si está abierto;
@@ -17,7 +17,7 @@ Qué hace (y se salta lo que ya esté listo):
           del proyecto (puerto 5433 o el siguiente libre), sin permisos de administrador;
        d) si no hay ninguno, instala PostgreSQL 16 portátil (descarga única de ≈30 MB) y sigue como en c);
        e) si eso falla y Docker Desktop está instalado pero cerrado, lo abre y lo usa.
-     Los archivos de PostgreSQL van FUERA del proyecto (macOS: ~/Library/Application Support/ACTHO,
+     El entorno de Python y los archivos de PostgreSQL van FUERA del proyecto (macOS: ~/Library/Application Support/ACTHO,
      Windows: %LOCALAPPDATA%\\ACTHO, Linux: ~/.local/share/actho) porque iCloud/OneDrive vuelven
      lentísimo el arranque. Si una versión anterior dejó .pgdata/ en el proyecto, se mueve allá.
   5. Procesa los datos de Datos/ solo si algún archivo cambió desde la última carga
@@ -28,7 +28,7 @@ Qué hace (y se salta lo que ya esté listo):
 
 Opciones:
     --solo-instalar            prepara el entorno y no ejecuta nada más
-    --reinstalar               borra y vuelve a crear .venv
+    --reinstalar               borra y vuelve a crear el entorno virtual
     --forzar                   vuelve a procesar los datos aunque no hayan cambiado
     --fecha-corte AAAA-MM-DD   fecha de corte de los indicadores (por defecto, hoy)
     --sin-tablero              procesa los datos pero no abre el tablero
@@ -58,19 +58,17 @@ import webbrowser
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent
-VENV = RAIZ / ".venv"
 PY_MINIMO = (3, 9)
 ES_WINDOWS = os.name == "nt"
 SISTEMA = platform.system()
-PY_VENV = VENV / ("Scripts/python.exe" if ES_WINDOWS else "bin/python")
-HASH_REQ = VENV / ".requirements.sha256"
 ENV = RAIZ / ".env"
 
 
 
 def _carpeta_datos_usuario() -> Path:
-    """PostgreSQL guarda sus archivos fuera del proyecto: si el proyecto está en una carpeta sincronizada
-    (iCloud Documentos, OneDrive, Dropbox), cada escritura se sincroniza y el servidor tarda minutos en arrancar."""
+    """El entorno de Python y PostgreSQL viven fuera del proyecto: si el proyecto está en una carpeta sincronizada
+    (iCloud Documentos con «Optimizar almacenamiento», OneDrive, Dropbox), sus miles de archivos se suben a la nube
+    y se descargan de nuevo al usarlos: importar las librerías o arrancar la base puede tardar más de 15 minutos."""
     if os.environ.get("ACTHO_DATOS"):
         return Path(os.environ["ACTHO_DATOS"])
     if SISTEMA == "Darwin":
@@ -81,6 +79,10 @@ def _carpeta_datos_usuario() -> Path:
 
 
 DATOS_USUARIO = _carpeta_datos_usuario()
+VENV = DATOS_USUARIO / "venv"
+PY_VENV = VENV / ("Scripts/python.exe" if ES_WINDOWS else "bin/python")
+HASH_REQ = VENV / ".requirements.sha256"
+LEGADO_VENV = RAIZ / ".venv"                  # ubicación de versiones anteriores (dentro del proyecto)
 PGDATA = DATOS_USUARIO / "pgdata"
 PGBIN_PROYECTO = DATOS_USUARIO / "postgres"   # PostgreSQL portátil que instala setup.py si hace falta
 LEGADO_PGDATA = RAIZ / ".pgdata"              # ubicación de versiones anteriores (dentro del proyecto)
@@ -152,7 +154,8 @@ def ejecutar(cmd, **kw):
 
 
 def entorno(url=None):
-    e = dict(os.environ, PYTHONIOENCODING="utf-8")
+    # Los .pyc tampoco se escriben dentro del proyecto (evita sincronizaciones de iCloud/OneDrive)
+    e = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONPYCACHEPREFIX=str(DATOS_USUARIO / "pycache"))
     if url:
         e["DATABASE_URL"] = url
     return e
@@ -183,17 +186,22 @@ def preparar_entorno(reinstalar):
         info("Borrando el entorno virtual anterior…")
         shutil.rmtree(VENV, ignore_errors=True)
     if VENV.exists() and not venv_funciona():
-        aviso(".venv existe pero no funciona en este equipo (¿se copió de otro?). Se vuelve a crear.")
+        aviso("El entorno virtual existe pero no funciona en este equipo. Se vuelve a crear.")
         shutil.rmtree(VENV, ignore_errors=True)
+    if LEGADO_VENV.exists():
+        aviso(f"La carpeta .venv del proyecto ya no se usa (el entorno ahora vive en {VENV}). Puedes borrarla para "
+              "liberar espacio en iCloud:  rm -rf .venv" if not ES_WINDOWS else
+              f"La carpeta .venv del proyecto ya no se usa (el entorno ahora vive en {VENV}). Puedes borrarla.")
     if venv_funciona():
-        salto("Entorno virtual .venv ya existe")
+        salto(f"Entorno virtual ya existe ({VENV})")
         return
-    info("Creando el entorno virtual .venv…")
+    info(f"Creando el entorno virtual en {VENV} (fuera del proyecto, para que iCloud/OneDrive no lo vuelvan lento)…")
     try:
+        VENV.parent.mkdir(parents=True, exist_ok=True)
         venv.EnvBuilder(with_pip=True, clear=True).create(VENV)
     except Exception as e:  # noqa: BLE001
         fallar(f"No se pudo crear el entorno virtual: {e}", "En Ubuntu/Debian:  sudo apt install python3-venv")
-    ok("Entorno virtual .venv creado")
+    ok("Entorno virtual creado")
 
 
 def instalar_librerias():
@@ -215,7 +223,7 @@ def instalar_librerias():
 
 def configurar_vscode():
     archivo = RAIZ / ".vscode" / "settings.json"
-    ruta = "${workspaceFolder}/.venv/" + ("Scripts/python.exe" if ES_WINDOWS else "bin/python")
+    ruta = str(PY_VENV)
     datos = {}
     if archivo.exists():
         try:
@@ -228,7 +236,7 @@ def configurar_vscode():
     datos["python.terminal.activateEnvironment"] = True
     archivo.parent.mkdir(exist_ok=True)
     archivo.write_text(json.dumps(datos, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    ok("VS Code configurado para usar .venv")
+    ok("VS Code configurado para usar el entorno del proyecto")
 
 
 def verificar_datos():
@@ -586,16 +594,18 @@ def asegurar_postgres(auto=False):
 # 5. Datos
 # ──────────────────────────────────────────────────────────────────────────────
 def procesar_datos(url, fecha_corte, forzar):
+    """Limpia y carga si algo cambió. Devuelve True si hay que (re)entrenar los modelos de IA."""
     cmd = [PY_VENV, "src/ingesta_control.py", "ingesta"]
     if fecha_corte:
         cmd += ["--fecha-corte", fecha_corte]
     if forzar:
         cmd.append("--forzar")
     info("Revisando si los datos cambiaron…")
-    r = ejecutar(cmd, env=entorno(url), capture_output=True, text=True)
+    r = ejecutar(cmd, env=dict(entorno(url), ACTHO_MODELOS="segundo_plano"), capture_output=True, text=True)
     salida = (r.stdout or "") + (r.stderr or "")
     if r.returncode != 0:
         fallar("Falló el procesamiento de los datos.", salida[-2500:])
+    pendiente = False
     for linea in salida.splitlines():
         if linea.startswith("Datos al día"):
             salto("Datos al día: ningún archivo cambió desde la última carga")
@@ -604,7 +614,32 @@ def procesar_datos(url, fecha_corte, forzar):
         elif linea.startswith("Semáforo al"):
             ok(linea)
         elif linea.startswith("Modelos de IA"):
-            (aviso if "no se entrenaron" in linea else ok)(linea)
+            if "pendiente" in linea:
+                pendiente = True
+            elif "al día" in linea:
+                salto("Modelos de IA al día")
+            else:
+                (aviso if "no se entrenaron" in linea else ok)(linea)
+    return pendiente
+
+
+def entrenar_modelos_en_segundo_plano(url, fecha_corte):
+    """Entrena los modelos mientras el tablero ya está abierto; las secciones de IA aparecen al terminar."""
+    registro = DATOS_USUARIO / "modelos_ia.log"
+    cmd = [str(PY_VENV), "src/ingesta_control.py", "modelos"]
+    if fecha_corte:
+        cmd += ["--fecha-corte", fecha_corte]
+    info(f"Entrenando los modelos de IA en segundo plano (aparecen en el tablero al terminar; registro: {registro})")
+    with open(registro, "w", encoding="utf-8") as f:
+        return subprocess.Popen(cmd, cwd=RAIZ, env=entorno(url), stdout=f, stderr=subprocess.STDOUT)
+
+
+def entrenar_modelos_ahora(url, fecha_corte):
+    cmd = [PY_VENV, "src/ingesta_control.py", "modelos"] + (["--fecha-corte", fecha_corte] if fecha_corte else [])
+    info("Entrenando los modelos de IA…")
+    r = ejecutar(cmd, env=entorno(url), capture_output=True, text=True)
+    linea = next((x for x in (r.stdout or "").splitlines() if x.startswith("Modelos de IA")), "")
+    (ok if r.returncode == 0 and "no se entrenaron" not in linea else aviso)(linea or "Modelos de IA: sin respuesta")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -618,11 +653,15 @@ def puerto_libre(desde):
     return desde
 
 
-def esperar_tablero(url, proceso, segundos=90):
-    fin = time.time() + segundos
-    while time.time() < fin:
+def esperar_tablero(url, proceso, segundos=240):
+    inicio = time.time()
+    ultimo = inicio
+    while time.time() - inicio < segundos:
         if proceso.poll() is not None:
             return False
+        if time.time() - ultimo > 30:
+            ultimo = time.time()
+            info(f"El tablero sigue arrancando ({int(time.time() - inicio)} s)…")
         try:
             with urllib.request.urlopen(url + "/_stcore/health", timeout=2) as r:
                 if r.status == 200:
@@ -662,10 +701,17 @@ def correr_tablero(url_bd, puerto, abrir):
     proc = subprocess.Popen([str(PY_VENV), "-m", "streamlit", "run", APP, "--server.port", str(p),
                              "--server.headless", "true", "--server.address", "localhost",
                              "--browser.gatherUsageStats", "false"],
-                            cwd=RAIZ, env=entorno(url_bd))
+                            cwd=RAIZ, env=entorno(url_bd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, encoding="utf-8", errors="replace", bufsize=1)
+
+    def _copiar():   # la salida de Streamlit va a la consola y a setup.log
+        for linea in proc.stdout:
+            sys.stdout.write(linea)
+    import threading
+    threading.Thread(target=_copiar, daemon=True).start()
     if not esperar_tablero(url, proc):
         proc.terminate()
-        fallar("El tablero no arrancó. Revisa el mensaje de arriba.")
+        fallar("El tablero no arrancó. Revisa el mensaje de arriba.", f"También quedó en {REGISTRO.name}.")
     ok(f"Tablero listo en {url}")
     if abrir:
         ok(f"Abierto en {abrir_en_chrome(url)}")
@@ -682,11 +728,60 @@ def correr_tablero(url_bd, puerto, abrir):
             proc.kill()
 
 
+REGISTRO = RAIZ / "setup.log"
+
+
+class _Duplicar:
+    """Escribe lo que sale en la consola también en setup.log, para poder revisar después qué pasó."""
+    def __init__(self, original, archivo):
+        self.original, self.archivo = original, archivo
+
+    def write(self, texto):
+        self.original.write(texto)
+        try:
+            self.archivo.write(texto)
+            self.archivo.flush()
+        except Exception:  # noqa: BLE001
+            pass
+        return len(texto)
+
+    def flush(self):
+        self.original.flush()
+
+    def __getattr__(self, nombre):
+        return getattr(self.original, nombre)
+
+
+def _abrir_registro():
+    try:
+        f = open(REGISTRO, "w", encoding="utf-8")
+        f.write(f"setup.py · {time.strftime('%Y-%m-%d %H:%M:%S')} · Python {sys.version.split()[0]} · "
+                f"{platform.platform()}\n\n")
+        sys.stdout = _Duplicar(sys.stdout, f)
+        sys.stderr = _Duplicar(sys.stderr, f)
+    except OSError:
+        pass
+
+
 def main():
     try:
         sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
     except Exception:  # noqa: BLE001
         pass
+    _abrir_registro()
+    try:
+        _main()
+    except (SystemExit, KeyboardInterrupt):
+        raise
+    except Exception:  # noqa: BLE001
+        import traceback
+        traceback.print_exc()
+        fallar("setup.py se detuvo por un error inesperado (detalle arriba).",
+               f"Todo lo que salió en la consola quedó en {REGISTRO.name}: compártelo para revisarlo.")
+
+
+def _main():
     ap = argparse.ArgumentParser(description="Deja el tablero ACTHO corriendo en este equipo")
     ap.add_argument("--solo-instalar", action="store_true")
     ap.add_argument("--reinstalar", action="store_true")
@@ -708,10 +803,14 @@ def main():
         return
     verificar_datos()
     url_bd, _ = asegurar_postgres(auto=args.si)
-    procesar_datos(url_bd, args.fecha_corte, args.forzar)
+    pendiente = procesar_datos(url_bd, args.fecha_corte, args.forzar)
     if args.sin_tablero:
+        if pendiente:
+            entrenar_modelos_ahora(url_bd, args.fecha_corte)
         print("\nDatos listos. Para abrir el tablero:  python3 setup.py\n")
         return
+    if pendiente:
+        entrenar_modelos_en_segundo_plano(url_bd, args.fecha_corte)
     correr_tablero(url_bd, args.puerto, not args.sin_navegador)
 
 

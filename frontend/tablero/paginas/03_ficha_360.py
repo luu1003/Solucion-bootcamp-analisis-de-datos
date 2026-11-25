@@ -7,6 +7,7 @@ import streamlit as st
 
 import comun as c
 import extracto
+import ia
 
 todas = c.empresas()
 crm = todas[todas["en_crm"] == 1].sort_values(["es_vigente", "puntaje_riesgo"], ascending=[False, False])
@@ -187,9 +188,78 @@ with der, c.panel():
     c.pulso(acciones, titulo="Acciones sugeridas", lema="Reglas de Pulso a partir de su ficha")
     if vigente or emp["en_crm"] == 1:
         enc_ext = enc_e.copy()
-        st.download_button("Descargar extracto de valor", extracto.html_extracto(emp, uso_e, asis_e, enc_ext, cat, p["fecha_corte"]).encode("utf-8"),
+        rec_e = ia.t("recomendacion")
+        rec_e = rec_e[rec_e["empresa_id"] == emp_id] if len(rec_e) else None
+        st.download_button("Descargar extracto de valor", extracto.html_extracto(emp, uso_e, asis_e, enc_ext, cat, p["fecha_corte"],
+                                                                                 rec_e).encode("utf-8"),
                            file_name=f"extracto_valor_{emp_id}.html", mime="text/html", type="primary",
                            icon=":material/description:", key="ficha_extracto", **c.ancho(st.download_button),
                            help="Página lista para imprimir o guardar como PDF con lo que la empresa usó en el año")
     if isinstance(emp.get("inconsistencia"), str) and emp["inconsistencia"]:
         st.warning(f"Dato por revisar en el CRM: {emp['inconsistencia']}")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Apoyo de IA
+# ──────────────────────────────────────────────────────────────────────────────
+def _lista(txt):
+    return "".join(f"<li>{c._e(x)}</li>" for x in str(txt).split(" · ") if x and x != "nan")
+
+
+with der, c.tarjeta("Apoyo de IA", "Lo que sugieren los modelos para esta empresa"):
+    if not ia.hay():
+        ia.sin_modelos()
+    else:
+        ren = ia.renovacion()
+        r = ren[ren["empresa_id"] == emp_id]
+        if len(r):
+            r = r.iloc[0]
+            color = ia.BANDA_COLOR.get(r["banda"], c.C["morado"])
+            st.markdown(
+                f'<div style="display:flex;align-items:baseline;gap:.6rem"><span style="font-size:2rem;font-weight:700;'
+                f'color:{color}">{100 * r["p_renovar"]:.0f} %</span><span>probabilidad de renovar</span></div>'
+                f'{ia.chip(r["banda"])}'
+                + (f'<p style="margin:.5rem 0 .1rem;font-size:.8rem"><b>A favor</b></p><ul style="margin:0;font-size:.8rem">'
+                   f'{_lista(r["a_favor"])}</ul>' if r["a_favor"] else "")
+                + (f'<p style="margin:.4rem 0 .1rem;font-size:.8rem"><b>En contra</b></p><ul style="margin:0;font-size:.8rem">'
+                   f'{_lista(r["en_contra"])}</ul>' if r["en_contra"] else ""),
+                unsafe_allow_html=True)
+            ia.nota("renovacion")
+        acc = ia.t("accion")
+        a = acc[acc["empresa_id"] == emp_id] if len(acc) else acc
+        if len(a):
+            c.actividad(f"Siguiente paso: {a.iloc[0]['accion']}", a.iloc[0]["motivo"], acento=True)
+        per = ia.perfiles()
+        pe = per[per["empresa_id"] == emp_id] if len(per) else per
+        if len(pe):
+            res = ia.t("perfil_resumen").set_index("perfil")
+            nombre = pe.iloc[0]["perfil"]
+            c.actividad(f"Perfil: {nombre}", res.loc[nombre, "descripcion"] if nombre in res.index else "")
+        rec = ia.t("recomendacion")
+        rec = rec[rec["empresa_id"] == emp_id] if len(rec) else rec
+        for x in rec.itertuples():
+            c.actividad(f"{x.tipo}: {x.recomendacion}", x.motivo)
+        par = ia.t("empresa_parecida")
+        par = par[par["empresa_id"] == emp_id] if len(par) else par
+        if len(par):
+            info = ren.set_index("empresa_id")["banda"] if len(ren) else {}
+            filas = [{"e": x.parecida_id, "s": f"{100 * x.similitud:.0f}",
+                      "b": ia.chip(info.get(x.parecida_id, "—")) if len(ren) else ""} for x in par.itertuples()]
+            st.markdown('<p style="margin:.6rem 0 .2rem;font-size:.8rem"><b>Empresas parecidas</b> (misma forma de '
+                        'usar la membresía)</p>', unsafe_allow_html=True)
+            c.tabla_html(filas, [("Empresa", "e", "texto"), ("Parecido", "s", "num"), ("Renovación", "b", "html")])
+            def _abrir():
+                v = st.session_state.get("ficha_parecida")
+                if v and v != "—":
+                    st.session_state["ficha_empresa"] = st.session_state["empresa_sel"] = v
+                st.session_state["ficha_parecida"] = "—"
+
+            st.selectbox("Abrir la ficha de una empresa parecida", ["—"] + par["parecida_id"].tolist(),
+                         key="ficha_parecida", on_change=_abrir)
+        if not vigente:
+            pr = ia.propension()
+            x = pr[pr["empresa_id"] == emp_id] if len(pr) else pr
+            if len(x):
+                c.actividad(f"Parecido con afiliadas: {x.iloc[0]['puntaje']:.0f} / 100 ({x.iloc[0]['banda']})",
+                            "Qué tanto se parece su forma de participar a la de las empresas afiliadas", acento=True)
+                ia.nota("propension")

@@ -5,6 +5,7 @@ DAG · actho_recalculo_riesgo_diario
 Recalcula el semáforo de riesgo cada día (README, sección 9.2):
 
     actualizar_semaforo → reportar_alertas
+                        → entrenar_modelos (modelos de IA, src/modelos_ia.py)
 
 * Corre todos los días a las 6:00 a. m. (hora de Bogotá) y también al terminar
   cada ingesta (lo dispara actho_ingesta_datos).
@@ -14,6 +15,8 @@ Recalcula el semáforo de riesgo cada día (README, sección 9.2):
   de los parámetros usados) y la foto del mes en historial.snapshot_membresia,
   que permite medir renovaciones reales (historial.v_movimientos_mensuales).
 * Reporta las empresas que pasaron a rojo desde la evaluación anterior.
+* Reentrena los modelos de IA (esquema ia) si cambió la fecha de corte o si lo
+  disparó una ingesta con datos nuevos. Si falla, el semáforo ya quedó guardado.
 """
 from __future__ import annotations
 
@@ -66,7 +69,20 @@ def actho_recalculo_riesgo_diario():
         # Aquí se conectará la notificación (correo o tarea en Zoho) de la sección 8 del README.
         return len(rojos)
 
-    reportar_alertas(actualizar_semaforo())
+    @task
+    def entrenar_modelos(resultado: dict) -> str:
+        import ingesta_control as ic
+        ctx = get_current_context()
+        conf = (ctx["dag_run"].conf or {}) if ctx.get("dag_run") else {}
+        estado = ic.entrenar_modelos(ic.conectar(), resultado["fecha_corte"], forzar=bool(conf.get("fecha_corte")))
+        print("Modelos de IA:", estado)
+        if estado.startswith("no se entrenaron"):
+            raise RuntimeError(estado)
+        return estado
+
+    resultado = actualizar_semaforo()
+    reportar_alertas(resultado)
+    entrenar_modelos(resultado)
 
 
 actho_recalculo_riesgo_diario()
