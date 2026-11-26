@@ -139,7 +139,7 @@ with principal:
     f1, f2 = c.columnas(2, "pareja")
     composicion(f1, "tipo_membresia", "Por tipo de afiliado")
     composicion(f2, "tamano_empresa", "Por tamaño de empresa")
-    f3, f4 = st.columns(2)
+    f3, f4 = c.columnas(2, "pareja")
     composicion(f3, "sector", "Por sector (10 principales)", top=10)
     composicion(f4, "ciudad", "Por ciudad (10 principales)", top=10)
 
