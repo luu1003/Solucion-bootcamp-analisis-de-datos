@@ -53,7 +53,7 @@ c.kpi(k[3], "Tasa de renovación", c.fmt(renov["tasa"], 1, " %"), f"{renov['tipo
 c.kpi(k[4], "Retiros", c.fmt(renov["no_renovo"]), "No renovaron en 12 meses",
       chip_=("Riesgo", "Motivo no registrado"), ayuda_=c.ayuda("Retiros"))
 
-izq, der = st.columns([2.3, 1], gap="medium")
+izq, der = c.columnas([2.3, 1], "lateral", gap="medium")
 with izq:
     with c.tarjeta():
         c.cabeza("Calendario de renovaciones", f"{c.fmt(len(prox))} empresas por contactar · primero las de mayor prioridad")
@@ -79,7 +79,7 @@ with izq:
                              "inscripciones_12m": "Asist. 12m",
                              "satisfaccion_promedio": "Satisf.",
                              "motivos_riesgo": st.column_config.TextColumn("Motivos", width="large")})
-        b1, b2, b3 = st.columns([1.25, 1.25, 1])
+        b1, b2, b3 = c.columnas([1.25, 1.25, 1], "controles")
         with b1:
             c.descargar(lista, f"vencimientos_{ventana}_dias.csv", "Exportar para campaña de renovación")
         if len(lista):

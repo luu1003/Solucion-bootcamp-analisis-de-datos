@@ -74,7 +74,7 @@ c.kpi(k[2], "Encuestas con evento", c.fmt(100 * enc["evento_id"].notna().mean(),
 c.kpi(k[3], "Empresas fuera del CRM", c.fmt((emp["en_crm"] == 0).sum()), "Participan sin registro en Zoho",
       chip_=("Alerta", "Unificar identidad"))
 
-izq, der = st.columns([2.2, 1], gap="medium")
+izq, der = c.columnas([2.2, 1], "lateral", gap="medium")
 with izq:
     with c.tarjeta():
         c.cabeza("Cargas recientes", "Ejecuciones de Airflow y archivos procesados")

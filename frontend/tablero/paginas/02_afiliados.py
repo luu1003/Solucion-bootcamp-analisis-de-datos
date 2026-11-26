@@ -13,7 +13,7 @@ for col in ("p_renovar", "banda", "perfil", "propension", "a_favor", "en_contra"
     if col not in e:
         e[col] = None
 
-f1, f2, f3, f5, f4 = st.columns([1.9, 1.1, 1.1, 1.3, 0.9])
+f1, f2, f3, f5, f4 = c.columnas([1.9, 1.1, 1.1, 1.3, 0.9], "controles")
 universo = f1.segmented_control("Universo", ["Vigentes", "Todos en CRM", "No afiliados"], default="Vigentes",
                                 key="dir_universo") if hasattr(st, "segmented_control") else \
     f1.radio("Universo", ["Vigentes", "Todos en CRM", "No afiliados"], horizontal=True, key="dir_universo")
@@ -61,7 +61,7 @@ vista = orden[["empresa_id", "semaforo", "puntaje_riesgo"] + col_ia + ["nivel_20
 vista["satisfaccion_promedio"] = vista["satisfaccion_promedio"].map(lambda v: c.fmt(v, 2))
 vista["semaforo"] = vista["semaforo"].map(c.SEM_TXT).fillna("Sin evaluar")
 
-izq, der = st.columns([3, 1.05], gap="medium")
+izq, der = c.columnas([3, 1.05], "lateral", gap="medium")
 with izq, c.tarjeta():
     c.cabeza("Directorio de afiliados", ("Ordenado por parecido con las afiliadas" if no_af else
                                          "Ordenado por riesgo y cercanía del vencimiento") + " · marca una fila para ver su resumen")
