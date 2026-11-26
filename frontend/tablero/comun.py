@@ -91,243 +91,20 @@ _CINTA = ('<svg xmlns="http://www.w3.org/2000/svg" width="170" height="300" view
           'stroke="#FF5A0F" stroke-width="18" stroke-linecap="round"/></svg>')
 CINTA_URI = "data:image/svg+xml;base64," + base64.b64encode(_CINTA.encode()).decode()
 
-CSS = f"""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
-html, body, .stApp, [class*="css"], .stMarkdown, p, span, label, button, input, textarea, select, li, div {{
-  font-family: 'Poppins', sans-serif; }}
-code {{ font-family: ui-monospace, monospace !important; }}
-.stApp {{ background: {C['menta']}; }}
-header[data-testid="stHeader"] {{ background: transparent; }}
-.block-container {{ padding: 1rem 1rem 2rem 1rem !important; max-width: 1480px; }}
-[data-testid="stVerticalBlock"] {{ gap: .85rem; }}
+# Estilos: el CSS vive en recursos/estilos.css. Aquí solo se publican los colores de C como variables CSS
+# (--morado, --naranja-texto…) y la cinta como --cinta, para que el color tenga una sola fuente.
+ESTILOS = Path(__file__).parent / "recursos" / "estilos.css"
 
-/* ── Barra lateral (componente Sidebar) ── */
-[data-testid="stSidebar"] {{ background: {C['morado']}; border-right: none; }}
-[data-testid="stSidebar"] > div:first-child {{ background: url("{CINTA_URI}") no-repeat right -34px bottom 64px / 118px auto; }}
-[data-testid="stSidebar"] * {{ color: #FFFFFF; }}
-[data-testid="stSidebarNav"] {{ padding-top: .2rem; }}
-[data-testid="stSidebarNav"] a {{ border-radius: 999px; padding: .3rem .85rem !important; margin: 1px 0 !important; min-height: 0 !important; line-height: 1.6; }}
-[data-testid="stSidebarNav"] li {{ margin: 0 !important; }}
-[data-testid="stSidebarNav"] a span {{ font-size: .9rem; font-weight: 500; color: #FFFFFF !important; }}
-[data-testid="stSidebarNav"] a:hover {{ background: rgba(255,255,255,.12); }}
-[data-testid="stSidebarNav"] a[aria-current="page"] {{ background: #FFFFFF; }}
-[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"],
-[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] * {{ color: {C['morado']} !important; }}
-[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] span {{ font-weight: 600 !important; }}
-[data-testid="stNavSectionHeader"], [data-testid="stSidebarNav"] header, [data-testid="stSidebarNavSeparator"] + * {{ }}
-[data-testid="stNavSectionHeader"] {{ color: {C['cian_claro']} !important; font-size: .72rem !important; font-weight: 600 !important;
-  letter-spacing: .08em; text-transform: uppercase; margin-top: .8rem !important; }}
-[data-testid="stNavSectionHeader"] * {{ color: {C['cian_claro']} !important; }}
-[data-testid="stSidebarNavSeparator"] {{ border-color: rgba(255,255,255,.2); }}
-[data-testid="stSidebarHeader"] {{ padding-top: 1.4rem; padding-bottom: .4rem; }}
-[data-testid="stSidebarHeader"] img, [data-testid="stLogo"] {{ height: 2.9rem !important; max-width: 9rem; }}
-[data-testid="stSidebar"] [data-testid="stExpander"] details {{ background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); border-radius: 16px; }}
-[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {{ color: #fff; }}
-[data-testid="stSidebar"] [data-baseweb="select"] > div, [data-testid="stSidebar"] [data-baseweb="input"] {{ background: #fff; border-radius: 12px; }}
-[data-testid="stSidebar"] [data-baseweb="select"] *, [data-testid="stSidebar"] input,
-[data-testid="stSidebar"] [data-baseweb="tag"] * {{ color: {C['tinta']} !important; }}
-[data-testid="stSidebar"] [data-baseweb="tag"] {{ background: {C['lavanda']} !important; }}
-[data-testid="stSidebar"] .stButton button {{ background: transparent; border: 1px solid rgba(255,255,255,.6); }}
-.lema-lateral {{ color: {C['cian_claro']}; font-size: .8rem; font-weight: 500; margin: -.2rem 0 .2rem; }}
-.usuario {{ display:flex; align-items:center; gap:.65rem; border-top: 1px solid rgba(255,255,255,.2); padding-top: .9rem; margin-top: .6rem; }}
-.usuario .avatar {{ width: 36px; height: 36px; border-radius: 50%; background: #fff; color: {C['morado']} !important;
-  display:flex; align-items:center; justify-content:center; font-weight: 700; font-size: .8rem; }}
-.usuario b {{ display:block; font-size: .85rem; font-weight: 600; }} .usuario small {{ font-size: .72rem; color: {C['lavanda_2']} !important; }}
 
-/* ── Encabezado de página ── */
-.titulo {{ font-size: 1.75rem !important; font-weight: 700 !important; color: {C['tinta']} !important; margin: 0 !important; line-height: 1.15 !important; letter-spacing: -.01em; }}
-.subtitulo {{ color: {C['gris']} !important; margin: .2rem 0 0 !important; font-size: .9rem !important; }}
-.pildoras {{ display:flex; gap:.5rem; flex-wrap:wrap; justify-content:flex-end; padding-top: .3rem; }}
-.pildora {{ display:inline-flex; align-items:center; gap:.45rem; border-radius: 999px; padding: .42rem .9rem .42rem .7rem;
-  font-size: .72rem; font-weight: 500; letter-spacing: .02em; text-transform: uppercase; background: #fff;
-  border: 1px solid {C['linea']}; color: {C['tinta']}; white-space: nowrap; }}
-.pildora b {{ font-weight: 700; }}
-.pildora i {{ width: 9px; height: 9px; border-radius: 50%; display:inline-block; background: {C['gris']}; }}
-.pildora.ok i {{ background: {C['cian_graf']}; }} .pildora.alerta i {{ background: {C['naranja']}; }}
-.pildora.riesgo i {{ background: {C['naranja']}; }} .pildora.morado i {{ background: {C['morado']}; }}
+def _tokens_css() -> str:
+    lineas = [f"  --{nombre.replace('_', '-')}: {valor};" for nombre, valor in C.items()]
+    lineas.append(f'  --cinta: url("{CINTA_URI}");')
+    return ":root {\n" + "\n".join(lineas) + "\n}"
 
-/* ── Tarjetas (contenedores con borde) ── */
-div[class*="st-key-tarjeta"] {{ background:#FFFFFF !important; border:none !important; border-radius:20px !important;
-  padding: 1.05rem 1.2rem 1rem !important; box-shadow: none !important; }}
-div[class*="st-key-tarjeta"] div[class*="st-key-tarjeta"] {{ padding: .4rem 0 0 !important; }}
-[data-testid="stVerticalBlockBorderWrapper"]:has(> div > [data-testid="stVerticalBlock"]) {{ }}
-div[data-testid="stVerticalBlockBorderWrapper"][data-test-scroll-behavior], div[class*="st-key-tarjeta"],
-[data-testid="stVerticalBlockBorderWrapper"] {{ border-radius: 20px !important; }}
-[data-testid="stVerticalBlockBorderWrapper"]:not(:has([data-testid="stVerticalBlockBorderWrapper"])) {{ }}
-.stVerticalBlock.st-key-x {{ }}
-div[data-testid="stLayoutWrapper"] > div[data-testid="stVerticalBlock"][class*="border"] {{ }}
-.cabeza {{ margin: 0 0 .35rem; }}
-.cabeza h3 {{ font-size: 1.02rem !important; font-weight: 600 !important; color: {C['morado']} !important; margin: 0 !important; padding: 0 !important; line-height: 1.3 !important; }}
-.cabeza p {{ font-size: .76rem !important; font-weight: 500 !important; color: {C['naranja_texto']} !important; margin: .1rem 0 0 !important; }}
-.cabeza.oscura h3 {{ color: #fff !important; }} .cabeza.oscura p {{ color: {C['cian_claro']} !important; }}
 
-/* ── KPI ── */
-.kpi {{ background:#fff; border-radius: 20px; padding: 1rem 1.15rem; height: 100%; display:flex; flex-direction:column; gap:.3rem; }}
-.kpi .et {{ font-size: .7rem; color: {C['gris']}; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }}
-.kpi .va {{ font-size: clamp(1.45rem, 2.1vw, 2rem); font-weight: 700; color: {C['tinta']}; line-height: 1.05; letter-spacing: -.02em; white-space: nowrap; }}
-.kpi .et, .meta .et-meta {{ word-break: normal; overflow-wrap: normal; hyphens: manual; }}
-.kpi .no {{ font-size: .74rem; color: {C['gris']}; line-height: 1.35; }}
-.kpi.oscuro {{ background: {C['morado']}; }}
-.kpi.oscuro .et {{ color: {C['lavanda_2']}; }} .kpi.oscuro .va {{ color: #fff; }} .kpi.oscuro .no {{ color: {C['lavanda_2']}; }}
-
-/* ── Chips ── */
-.chip {{ display:inline-block; border-radius:999px; padding:.18rem .6rem; font-size:.7rem; font-weight:600; letter-spacing:.02em;
-  width: fit-content; max-width: 100%; white-space: normal; line-height: 1.35; overflow-wrap: anywhere; }}
-.tabla .chip {{ white-space: nowrap; }}
-.chip.ok, .chip.verde {{ background:{C['ok_suave']}; color:{C['ok']}; }}
-.chip.alerta, .chip.amarillo {{ background:{C['alerta_suave']}; color:{C['alerta']}; }}
-.chip.riesgo, .chip.rojo {{ background:{C['riesgo_suave']}; color:{C['riesgo']}; }}
-.chip.morado {{ background:{C['lavanda']}; color:{C['morado']}; }}
-.chip.neutro, .chip.gris {{ background:#F1EFF5; color:{C['gris']}; }}
-.chip.ia {{ background:#E3F6FA; color:#075E70; }}
-.chip.ia::before {{ content:'✦ '; }}
-.kpi.oscuro .chip.ia {{ background: rgba(138,230,247,.18); color:{C['cian_claro']}; }}
-.nota-ia {{ font-size:.74rem; color:{C['gris']}; margin:.15rem 0 .4rem; }}
-.nota-ia b {{ color:#075E70; }}
-.kpi.oscuro .chip.morado {{ background: rgba(255,255,255,.16); color:#fff; }}
-
-/* ── Distribución: sin superposiciones ni alturas distintas ── */
-/* Streamlit compensa el margen del último párrafo con margin-bottom:-16px; los componentes propios no lo tienen,
-   así que se anula para que el bloque siguiente no se monte encima. */
-[data-testid="stMarkdownContainer"]:has(.fila-tarjetas, .titulo, .subtitulo, .pildoras, .cabeza, .tabla, .heroe, .act,
-  .hallazgo, .panel-titulo, .usuario, .lema-lateral, .login-hero, .login-titulo, .login-fila, .filtros-ayuda) {{ margin-bottom: 0 !important; }}
-/* Tarjetas que comparten fila: todas con la altura de la más alta. */
-[data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stLayoutWrapper"]:only-child > div[class*="st-key-tarjeta"]) {{
-  align-items: stretch !important; }}
-[data-testid="stColumn"] > [data-testid="stVerticalBlock"]:has(> [data-testid="stLayoutWrapper"]:only-child > div[class*="st-key-tarjeta"]),
-[data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stLayoutWrapper"]:only-child:has(> div[class*="st-key-tarjeta"]),
-[data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stLayoutWrapper"]:only-child > div[class*="st-key-tarjeta"] {{
-  height: 100% !important; }}
-
-/* ── Filas de tarjetas del mismo tipo (altura uniforme) ── */
-.fila-tarjetas {{ display:grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: .85rem; align-items: stretch; }}
-@media (max-width: 1320px) {{ .kpi {{ padding: .9rem .9rem; }} .kpi .et {{ font-size: .66rem; letter-spacing: .03em; }} }}
-.fila-tarjetas > div {{ height: 100%; min-width: 0; }}
-@media (max-width: 1000px) {{ .fila-tarjetas {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} }}
-.et-meta {{ font-size: .7rem; color: {C['gris']}; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }}
-
-/* ── Metas 2027 ── */
-.meta {{ background:#fff; border-radius:20px; padding:1rem 1.15rem; height:100%; }}
-.meta .fila {{ display:flex; align-items:baseline; gap:.5rem; flex-wrap: wrap; margin-top:.3rem; }}
-.meta .va {{ font-size: clamp(1.5rem, 2vw, 1.9rem); font-weight:700; color:{C['tinta']}; letter-spacing:-.02em; }}
-.meta .obj {{ font-size:.78rem; color:{C['gris']}; }}
-.meta .barra {{ height:10px; background:{C['menta']}; border-radius:999px; margin:.55rem 0 .45rem; overflow:hidden; }}
-.meta .barra div {{ height:100%; border-radius:999px; background:{C['naranja']}; }}
-.meta .no {{ font-size:.74rem; color:{C['gris']}; }}
-
-/* ── Panel derecho morado ── */
-div[class*="st-key-panel"] {{ background: {C['morado']}; border-radius: 20px; padding: 1.1rem 1rem 1rem; position: relative; overflow: hidden; }}
-div[class*="st-key-panel"] div[class*="st-key-tarjeta"] {{ border-radius: 16px !important; padding: .9rem 1rem .8rem !important; }}
-div[class*="st-key-panel"] .stMarkdown p, div[class*="st-key-panel"] label {{ color: #fff; }}
-div[class*="st-key-panel"] div[class*="st-key-tarjeta"] .stMarkdown p {{ color: {C['tinta']}; }}
-.panel-titulo {{ color:#fff !important; font-size:1.08rem !important; font-weight:600 !important; margin:0 !important; }}
-.panel-lema {{ color:{C['cian_claro']} !important; font-size:.76rem !important; font-weight:500 !important; margin:.1rem 0 .3rem !important; }}
-.act {{ background:#fff; border-radius:14px; padding:.7rem .85rem; margin-bottom:.55rem; }}
-.act b {{ display:block; color:{C['tinta']}; font-size:.84rem; font-weight:600; line-height:1.3; }}
-.act span {{ display:block; color:{C['gris']}; font-size:.75rem; line-height:1.35; margin-top:.15rem; }}
-.act.acento {{ border-left: 4px solid {C['naranja']}; }}
-.hallazgo {{ display:flex; gap:.6rem; align-items:stretch; background:{C['lavanda']}; border-radius:12px; padding:.65rem .8rem; margin-bottom:.5rem; }}
-.hallazgo::before {{ content:''; width:4px; border-radius:2px; background:{C['morado']}; flex:none; }}
-.hallazgo div {{ font-size:.82rem; color:{C['tinta']}; line-height:1.4; }}
-
-/* ── Tabla HTML (componentes Tabla/Encabezado y Tabla/Fila) ── */
-.tabla {{ width:100%; border-collapse:collapse; }}
-.tabla th {{ white-space: nowrap; font-size:.7rem; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:{C['gris']};
-  text-align:left; padding:.5rem .6rem; border-bottom:1px solid {C['linea']}; background:transparent; }}
-.tabla td {{ font-size:.82rem; color:{C['tinta']}; padding:.55rem .6rem; border-bottom:1px solid {C['linea']}; vertical-align:middle; }}
-.tabla td .t {{ font-weight:600; display:block; }} .tabla td .d {{ color:{C['gris']}; font-size:.74rem; display:block; }}
-.tabla td.nw, .tabla td.nw .t, .tabla td.nw .d {{ white-space: nowrap; }}
-.tabla tr:last-child td {{ border-bottom:none; }} .tabla td.num {{ text-align:right; font-variant-numeric: tabular-nums; }}
-
-/* ── Héroe (tarjeta morada "Pregúntale a Pulso") ── */
-.heroe {{ background:{C['morado']} url("{CINTA_URI}") no-repeat right 30px top -60px / 150px auto; border-radius:20px; padding:1.3rem 1.5rem; }}
-.heroe .lema {{ color:{C['cian_claro']}; font-size:.8rem; font-weight:500; }}
-.heroe h2 {{ color:#fff !important; font-size:1.35rem !important; font-weight:700 !important; margin:.2rem 0 .2rem !important; padding:0 !important; }}
-.heroe p {{ color:{C['lavanda_2']} !important; font-size:.85rem !important; max-width: 70%; margin:0 !important; }}
-
-/* ── Controles ── */
-.stButton button, .stDownloadButton button {{ border-radius: 999px !important; font-weight: 600 !important; padding: .45rem 1.2rem !important; }}
-.stButton button[kind="primary"], .stDownloadButton button[kind="primary"], button[data-testid="stBaseButton-primary"] {{
-  background: {C['naranja_accion']} !important; border-color: {C['naranja_accion']} !important; color: #fff !important; }}
-.stButton button[kind="primary"]:hover, .stDownloadButton button[kind="primary"]:hover {{ background: {C['riesgo']} !important; border-color: {C['riesgo']} !important; }}
-button[data-testid="stBaseButton-secondary"] {{ background: #fff; color: {C['morado']}; border-color: {C['lavanda_2']}; }}
-[data-baseweb="select"] > div, [data-baseweb="input"], .stTextInput input, .stDateInput input {{ border-radius: 12px !important; }}
-[data-testid="stMain"] [data-baseweb="select"] > div, [data-testid="stMain"] [data-baseweb="input"] {{ background:#fff; border-color:{C['linea']}; }}
-[data-testid="stWidgetLabel"] p {{ font-size: .74rem !important; font-weight: 600 !important; color: {C['gris']} !important; text-transform: uppercase; letter-spacing: .05em; }}
-div[class*="st-key-panel"] [data-testid="stWidgetLabel"] p {{ color: {C['lavanda_2']} !important; }}
-.stTabs [data-baseweb="tab-list"] {{ gap: .4rem; border-bottom: none; }}
-.stTabs [data-baseweb="tab"] {{ background:#fff; border-radius:999px; padding:.4rem 1rem; height:auto; }}
-.stTabs [data-baseweb="tab"] p {{ font-weight:600; font-size:.85rem; color:{C['morado']}; }}
-.stTabs [aria-selected="true"] {{ background:{C['morado']}; }} .stTabs [aria-selected="true"] p {{ color:#fff !important; }}
-.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {{ display:none; }}
-/* Pestañas (Streamlit ≥ 1.6x: data-testid="stTab") como píldoras */
-[data-testid="stTabs"] [role="tablist"] {{ gap: .45rem; border: none !important; box-shadow: none !important; flex-wrap: wrap; }}
-[data-testid="stTabs"] [role="tablist"]::after, [data-testid="stTabs"] [role="tablist"]::before {{ display: none !important; }}
-[data-testid="stTab"] {{ background:#fff; border-radius:999px; padding:.5rem 1.15rem !important; height:auto !important;
-  border: 1px solid {C['linea']}; cursor: pointer; }}
-[data-testid="stTab"] p {{ font-weight:600 !important; font-size:.88rem !important; color:{C['morado']} !important; margin:0 !important; }}
-[data-testid="stTab"]:hover {{ border-color: {C['lavanda_graf']}; }}
-[data-testid="stTab"][aria-selected="true"] {{ background:{C['morado']}; border-color:{C['morado']}; }}
-[data-testid="stTab"][aria-selected="true"] p {{ color:#fff !important; }}
-[data-testid="stTab"] > div:not([data-testid]) {{ display:none !important; }}
-[data-testid="stSegmentedControl"] button, [data-testid="stButtonGroup"] button {{ border-radius: 999px !important; background:#fff; }}
-[data-testid="stButtonGroup"] button[aria-checked="true"], [data-testid="stButtonGroup"] button[kind*="Active"] {{
-  background:{C['morado']} !important; color:#fff !important; border-color:{C['morado']} !important; }}
-[data-testid="stDataFrame"] {{ border-radius: 12px; overflow: hidden; }}
-[data-testid="stMain"] [data-testid="stExpander"] details {{ background:#fff; border:none; border-radius:20px; }}
-[data-testid="stMain"] [data-testid="stExpander"] summary p {{ color:{C['morado']}; font-weight:600; }}
-[data-testid="stAlert"] {{ border-radius: 14px; }}
-[data-testid="stAlert"]:has([data-testid="stAlertContentInfo"]) > div {{ background: {C['lavanda']} !important; color: {C['tinta']} !important; }}
-[data-testid="stAlertContentInfo"] p, [data-testid="stAlertContentInfo"] svg {{ color: {C['morado_900']} !important; fill: {C['morado']} !important; font-size: .9rem; }}
-[data-testid="stCaptionContainer"] {{ color: {C['gris']}; }}
-
-/* ── Chips del nivel de riesgo: punto del mismo color del gráfico + texto (no depende solo del color) ── */
-.chip.sem {{ background:#F1EFF5; color:{C['tinta']}; display:inline-flex; align-items:center; gap:.35rem; }}
-.chip.sem::before {{ content:''; width:8px; height:8px; border-radius:50%; background: var(--c); flex:none; }}
-.chip.sem.alto {{ background:{C['naranja_suave']}; color:{C['riesgo']}; }}
-.kpi.oscuro .chip.sem {{ background: rgba(255,255,255,.16); color:#fff; }}
-
-/* ── Barra de filtros sobre el panel ── */
-div[class*="st-key-barra_filtros"] {{ background:#FFFFFF; border-radius:20px; padding: .75rem 1rem .55rem !important; gap: .35rem !important; }}
-div[class*="st-key-barra_filtros"] [data-testid="stHorizontalBlock"] {{ gap: .6rem !important; align-items: flex-end; }}
-div[class*="st-key-barra_filtros"] [data-baseweb="select"] > div, div[class*="st-key-barra_filtros"] [data-baseweb="input"] {{
-  background: {C['menta']} !important; border-color: transparent !important; min-height: 40px; }}
-div[class*="st-key-barra_filtros"] [data-baseweb="tag"] {{ background: {C['lavanda']} !important; }}
-div[class*="st-key-barra_filtros"] [data-baseweb="tag"] span {{ color: {C['morado']} !important; font-weight: 600; }}
-div[class*="st-key-barra_filtros"] .stButton button {{ min-height: 40px; white-space: nowrap; }}
-.filtros-ayuda {{ font-size: .76rem; color: {C['gris']}; margin: 0; display:flex; align-items:center; gap:.4rem; }}
-.filtros-ayuda b {{ color: {C['morado']}; font-weight: 600; }}
-div[class*="st-key-xf_activos"] [data-testid="stHorizontalBlock"] {{ flex-wrap: wrap; gap: .4rem !important; align-items: center; }}
-div[class*="st-key-xf_activos"] [data-testid="stColumn"] {{ width: auto !important; flex: 0 0 auto !important; min-width: 0 !important; }}
-div[class*="st-key-xf_quitar"] button {{ background: {C['morado']} !important; color:#fff !important; border-color: {C['morado']} !important;
-  padding: .2rem .8rem !important; min-height: 0 !important; font-size: .76rem !important; }}
-div[class*="st-key-xf_quitar"] button p {{ font-size: .76rem !important; }}
-div[class*="st-key-limpiar_filtros"] button {{ padding: .2rem .8rem !important; min-height: 0 !important; }}
-div[class*="st-key-limpiar_filtros"] button p {{ font-size: .76rem !important; }}
-
-/* ── Gráficos interactivos: cursor de clic, como en Power BI ── */
-div[class*="st-key-gi_"] .nsewdrag, div[class*="st-key-gi_"] .pielayer path, div[class*="st-key-gi_"] .hm {{ cursor: pointer !important; }}
-
-/* ── Ícono de ayuda con la definición del indicador (hover o foco con teclado) ── */
-.kpi, .meta {{ position: relative; }}
-.ayuda {{ display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; margin-left:.35rem;
-  border-radius:50%; background:{C['lavanda']}; color:{C['morado']}; font-size:.62rem; font-weight:700; cursor:help;
-  vertical-align: middle; position: relative; text-transform:none; letter-spacing:0; }}
-.kpi.oscuro .ayuda {{ background: rgba(255,255,255,.2); color:#fff; }}
-.ayuda:hover::after, .ayuda:focus::after {{ content: attr(data-tip); position:absolute; left:50%; top:22px; transform:translateX(-50%);
-  width: 260px; background:{C['morado_900']}; color:#fff; font-size:.74rem; font-weight:400; line-height:1.4;
-  padding:.6rem .7rem; border-radius:10px; z-index:1000; text-align:left; white-space:normal; box-shadow:0 8px 24px rgba(43,10,107,.25); }}
-div[class*="st-key-acciones_encabezado"] {{ display:flex; justify-content:flex-end; margin-top:.35rem; }}
-div[class*="st-key-acciones_encabezado"] [data-testid="stHorizontalBlock"] {{ justify-content:flex-end; }}
-
-/* ── Accesibilidad: foco visible al navegar con teclado (WCAG 2.4.7) ── */
-a:focus-visible, button:focus-visible, [role="tab"]:focus-visible, input:focus-visible, [tabindex]:focus-visible {{
-  outline: 3px solid {C['naranja']} !important; outline-offset: 2px !important; }}
-[data-testid="stSidebar"] a:focus-visible, [data-testid="stSidebar"] button:focus-visible {{ outline-color: {C['cian_claro']} !important; }}
-@media (prefers-reduced-motion: reduce) {{ * {{ transition: none !important; animation: none !important; }} }}
-</style>
-"""
+def css() -> str:
+    """Hoja de estilos completa: el archivo estilos.css y, al final, las variables de color."""
+    return "\n<style>\n" + ESTILOS.read_text(encoding="utf-8") + "\n" + _tokens_css() + "\n</style>\n"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -563,8 +340,13 @@ def barra_filtros():
     fmin, fmax = a["fecha_evento"].min().date(), max(a["fecha_evento"].max(), corte).date()
     st.session_state.setdefault("g_periodo", (fmin, fmax))
     with st.container(key="barra_filtros"):
-        cols = st.columns([1.95, 1, 1, 1.1, 1, 1])
-        st.session_state["w_periodo"] = _g("periodo")
+        cols = columnas([1.95, 1, 1, 1.1, 1, 1], "controles")
+        # Repone el periodo guardado (Streamlit borra el valor del widget al cambiar de página), salvo cuando
+        # la persona va a mitad de la selección: tras el primer clic el widget tiene una sola fecha y hay que
+        # conservarla para que pueda elegir la segunda.
+        en_curso = st.session_state.get("w_periodo")
+        if not (isinstance(en_curso, (list, tuple)) and len(en_curso) == 1):
+            st.session_state["w_periodo"] = _g("periodo")
         cols[0].date_input("Periodo", key="w_periodo", min_value=date(2025, 1, 1), max_value=date(2027, 12, 31),
                            format="DD/MM/YYYY", on_change=lambda: (
                                st.session_state.__setitem__("g_periodo", st.session_state["w_periodo"])
@@ -574,7 +356,7 @@ def barra_filtros():
             st.session_state[f"w_{col}"] = [v for v in (_g(col) or []) if v in opciones]
             cols[i].multiselect(et, opciones, key=f"w_{col}", placeholder="Todos", on_change=_sincronizar, args=(col,))
         hay = hay_filtros_empresa() or bool(xf()) or tuple(_g("periodo") or ()) != (fmin, fmax)
-        izq, der = st.columns([6, 1], vertical_alignment="center")
+        izq, der = columnas([6, 1], "texto_accion", vertical_alignment="center")
         activos = xf()
         with izq:
             if activos:
@@ -757,11 +539,20 @@ def _activos(alcance, excluir=()):
     return {d: v for d, v in xf().items() if XF_DIMS[d][1] == alcance and d not in excluir}
 
 
+def dentro_del_periodo(fechas: pd.Series) -> pd.Series:
+    """True para las fechas dentro del periodo elegido, con el último día completo.
+    Las respuestas de encuesta traen hora: comparar con <= fin (fin = 00:00) dejaba por fuera todo lo del último día."""
+    ini, fin = periodo()
+    if ini is None:
+        return pd.Series(True, index=fechas.index)
+    f = pd.to_datetime(fechas)
+    return (f >= ini) & (f < fin + pd.Timedelta(days=1))
+
+
 def _por_fecha(df, col_fecha):
     ini, fin = periodo()
     if ini is not None:
-        f = pd.to_datetime(df[col_fecha])
-        dentro = (f >= ini) & (f <= fin)
+        dentro = dentro_del_periodo(df[col_fecha])
         if "es_fechado" in df.columns:      # vinculaciones vigentes (comunidades) no dependen del periodo
             dentro = dentro | (df["es_fechado"] == 0)
         df = df[dentro]
@@ -829,9 +620,14 @@ def datos(excluir=()):
 # Componentes
 # ──────────────────────────────────────────────────────────────────────────────
 def estilo():
-    st.markdown(CSS, unsafe_allow_html=True)
+    st.markdown(css(), unsafe_allow_html=True)
+    recursos = Path(__file__).parent / "recursos"
     try:
-        st.logo(str(Path(__file__).parent / "recursos" / "logo.svg"), size="large")
+        # logo.svg ("ac" en blanco) va sobre la barra lateral morada.
+        # logo_oscuro.svg ("ac" en morado) se muestra en el header cuando la barra lateral
+        # está cerrada (en tablet se cierra sola), porque ahí el fondo es claro.
+        st.logo(str(recursos / "logo.svg"), size="large",
+                icon_image=str(recursos / "logo_oscuro.svg"))
     except Exception:  # noqa: BLE001
         pass
 
@@ -865,11 +661,11 @@ def encabezado(titulo: str, subtitulo: str, pildoras: list | None = None, filtro
                     ("OK" if carga is not None else "Neutro",
                      f"Última carga <b>{fecha_txt(carga) if carga is not None else 'manual'}</b>"),
                     ("Alerta" if calidad else "OK", f"<b>{calidad}</b> datos por revisar")]
-    izq, der = st.columns([2.4, 2.6])
-    izq.markdown(f'<p class="titulo" role="heading" aria-level="1">{_e(titulo)}</p><p class="subtitulo">{_e(subtitulo)}</p>',
+    izq, der = columnas([2.4, 2.6], "pareja")
+    izq.markdown(f'<h1 class="titulo">{_e(titulo)}</h1><p class="subtitulo">{_e(subtitulo)}</p>',
                  unsafe_allow_html=True)
-    cuerpo = "".join(f'<span class="pildora {TONOS.get(t, "neutro")}"><i aria-hidden="true"></i>{txt}</span>' for t, txt in pildoras)
-    der.markdown(f'<div class="pildoras" role="status">{cuerpo}</div>', unsafe_allow_html=True)
+    cuerpo = "".join(f'<li class="pildora {TONOS.get(t, "neutro")}"><i aria-hidden="true"></i>{txt}</li>' for t, txt in pildoras)
+    der.markdown(f'<ul class="pildoras" aria-label="Estado de los datos">{cuerpo}</ul>', unsafe_allow_html=True)
     if acciones is not None:
         with der, st.container(key="acciones_encabezado"):
             acciones()
@@ -886,7 +682,7 @@ def chip_semaforo(s):
     """Chip del nivel de riesgo: punto del color del gráfico + texto (Alto, Medio, Bajo)."""
     if s not in SEMAFORO:
         return chip("Sin evaluar")
-    return (f'<span class="chip sem{" alto" if s == "Rojo" else ""}" style="--c:{SEMAFORO[s]}">'
+    return (f'<span class="chip sem sem-{s.lower()}{" alto" if s == "Rojo" else ""}">'
             f'Riesgo {_e(SEM_TXT[s].lower())}</span>')
 
 
@@ -905,6 +701,25 @@ class _Fila:
 class _Ranura:
     def __init__(self, fila_: _Fila, i: int):
         self.fila, self.i = fila_, i
+
+
+TIPOS_COLUMNAS = ("lateral", "pareja", "controles", "texto_accion")
+
+
+def columnas(proporciones, tipo: str = "pareja", gap: str = "small", **kwargs) -> list:
+    """Igual que st.columns, pero la fila se adapta al ancho disponible (CSS: «Distribución adaptable» en estilos.css).
+
+    tipo="lateral":      contenido principal + panel. Con menos de 900 px, el panel baja debajo.
+    tipo="pareja":       dos o tres gráficas o tarjetas. Con menos de 620 px, una debajo de otra.
+    tipo="controles":    filtros o campos. Cada uno mide al menos 9,5 rem (el primero 14,5 rem)
+                         y los que no caben bajan a la línea siguiente.
+    tipo="texto_accion": un texto que ocupa el espacio libre y un botón a la derecha con su ancho natural.
+    """
+    if tipo not in TIPOS_COLUMNAS:
+        raise ValueError(f"tipo debe ser uno de {TIPOS_COLUMNAS}, no {tipo!r}")
+    _contador_columnas["n"] += 1
+    with st.container(key=f"col_{tipo}_{_contador_columnas['n']}"):
+        return st.columns(proporciones, gap=gap, **kwargs)
 
 
 def fila(n: int) -> list:
@@ -930,8 +745,9 @@ def _icono_ayuda(texto: str) -> str:
 def kpi(col, etiqueta, valor, nota="", oscuro=False, chip_=None, ayuda_=""):
     """Componente 'KPI/Tarjeta': ETIQUETA, valor, chip (tono, texto) y nota. ayuda_ = definición del indicador."""
     ch = chip(chip_[1], chip_[0]) if chip_ else ""
-    _poner(col, f'<div class="kpi{" oscuro" if oscuro else ""}"><div class="et">{_e(etiqueta)}{_icono_ayuda(ayuda_)}</div>'
-                f'<div class="va">{valor}</div>{ch}<div class="no">{nota}</div></div>')
+    _poner(col, f'<article class="kpi{" oscuro" if oscuro else ""}" aria-label="{_e(etiqueta)}">'
+                f'<div class="et">{_e(etiqueta)}{_icono_ayuda(ayuda_)}</div>'
+                f'<div class="va">{valor}</div>{ch}<div class="no">{nota}</div></article>')
 
 
 def meta(col, etiqueta, actual, objetivo, nota="", sufijo="%", chip_=None, ayuda_="", proyeccion=None):
@@ -941,29 +757,31 @@ def meta(col, etiqueta, actual, objetivo, nota="", sufijo="%", chip_=None, ayuda
     marca, txt_p = "", ""
     if proyeccion is not None and not pd.isna(proyeccion):
         pp = max(0, min(100, 100 * proyeccion / objetivo))
-        marca = (f'<span title="Proyección IA: {fmt(proyeccion, 1, sufijo)}" style="position:absolute;left:calc({pp:.0f}% - 2px);'
-                 f'top:-4px;bottom:-4px;width:4px;border-radius:2px;background:{C["cian_graf"]}"></span>')
-        txt_p = f'<div class="no" style="color:#075E70">✦ Proyección IA: <b>{fmt(proyeccion, 1, sufijo)}</b></div>'
-    _poner(col, f'<div class="meta"><div class="et-meta">{_e(etiqueta)}{_icono_ayuda(ayuda_)}</div>'
+        marca = (f'<span class="marca-ia" style="--pos:{pp:.0f}%" title="Proyección IA: {fmt(proyeccion, 1, sufijo)}"></span>')
+        txt_p = f'<div class="no ia">✦ Proyección IA: <b>{fmt(proyeccion, 1, sufijo)}</b></div>'
+    _poner(col, f'<article class="meta" aria-label="{_e(etiqueta)}"><div class="et-meta">{_e(etiqueta)}{_icono_ayuda(ayuda_)}</div>'
                 f'<div class="fila"><span class="va">{fmt(actual, 1, sufijo)}</span>'
                 f'<span class="obj">meta 2027: {fmt(objetivo, 0, sufijo)}</span> {ch}</div>'
-                f'<div class="barra" style="position:relative;overflow:visible"><div style="width:{pct:.0f}%"></div>{marca}</div>'
-                f'<div class="no">{nota}</div>{txt_p}</div>')
+                f'<div class="barra" role="progressbar" aria-label="Avance hacia la meta 2027" aria-valuemin="0" '
+                f'aria-valuemax="100" aria-valuenow="{pct:.0f}"><div class="relleno" style="--avance:{pct:.0f}%"></div>{marca}</div>'
+                f'<div class="no">{nota}</div>{txt_p}</article>')
 
 
 def cabeza(titulo: str, sub: str | None = None, oscuro=False):
     """Encabezado de tarjeta: título morado y subtítulo naranja (en panel morado: blanco y cian)."""
-    st.markdown(f'<div class="cabeza{" oscura" if oscuro else ""}"><h3>{_e(titulo)}</h3>'
+    st.markdown(f'<div class="cabeza{" oscura" if oscuro else ""}"><h2>{_e(titulo)}</h2>'
                 + (f"<p>{_e(sub)}</p>" if sub else "") + "</div>", unsafe_allow_html=True)
 
 
 _contador_tarjeta = {"n": 0}
 _contador_panel = {"n": 0}
+_contador_columnas = {"n": 0}
 
 
 def reiniciar_contadores():
     _contador_tarjeta["n"] = 0
     _contador_panel["n"] = 0
+    _contador_columnas["n"] = 0
 
 
 def tarjeta(titulo: str | None = None, sub: str | None = None):
@@ -982,7 +800,7 @@ def panel(titulo: str | None = None, lema: str | None = None):
     _contador_panel["n"] += 1
     with st.container(key=f"panel_{_contador_panel['n']}"):
         if titulo:
-            st.markdown(f'<p class="panel-titulo">{_e(titulo)}</p>' + (f'<p class="panel-lema">{_e(lema)}</p>' if lema else ""),
+            st.markdown(f'<h2 class="panel-titulo">{_e(titulo)}</h2>' + (f'<p class="panel-lema">{_e(lema)}</p>' if lema else ""),
                         unsafe_allow_html=True)
         yield
 
@@ -995,7 +813,7 @@ def actividad(titulo: str, meta_: str = "", acento=False):
 
 def pulso(items: list, titulo="Pulso", lema="Lo que dicen los datos hoy"):
     """Lecturas de Pulso como tarjetas blancas. Cada ítem: texto HTML '<b>título</b><br><span>detalle</span>'."""
-    st.markdown(f'<p class="panel-titulo">{_e(titulo)}</p><p class="panel-lema">{_e(lema)}</p>', unsafe_allow_html=True)
+    st.markdown(f'<h2 class="panel-titulo">{_e(titulo)}</h2><p class="panel-lema">{_e(lema)}</p>', unsafe_allow_html=True)
     for i in items:
         partes = i.split("<br>", 1)
         tit = partes[0].replace("<b>", "").replace("</b>", "") if partes[0].startswith("<b>") and partes[0].endswith("</b>") else partes[0]
@@ -1004,13 +822,13 @@ def pulso(items: list, titulo="Pulso", lema="Lo que dicen los datos hoy"):
 
 
 def hallazgo(texto: str):
-    st.markdown(f'<div class="hallazgo"><div>{texto}</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<aside class="hallazgo"><div>{texto}</div></aside>', unsafe_allow_html=True)
 
 
 def tabla_html(filas: list, columnas: list):
     """Tabla con el estilo de los componentes Tabla/Encabezado y Tabla/Fila.
     columnas: [(titulo, clave, tipo)] con tipo 'texto' | 'num' | 'html'. Una clave puede ser (titulo, detalle)."""
-    enc = "".join(f'<th scope="col" style="text-align:{"right" if t == "num" else "left"}">{_e(n)}</th>' for n, _, t in columnas)
+    enc = "".join(f'<th scope="col"{' class="num"' if t == "num" else ""}>{_e(n)}</th>' for n, _, t in columnas)
     cuerpo = ""
     for f in filas:
         celdas = ""
@@ -1027,8 +845,8 @@ def tabla_html(filas: list, columnas: list):
 
 
 def heroe(lema: str, titulo: str, texto: str = ""):
-    st.markdown(f'<div class="heroe"><div class="lema">{_e(lema)}</div><h2>{_e(titulo)}</h2>'
-                + (f"<p>{_e(texto)}</p>" if texto else "") + "</div>", unsafe_allow_html=True)
+    st.markdown(f'<section class="heroe"><div class="lema">{_e(lema)}</div><h2>{_e(titulo)}</h2>'
+                + (f"<p>{_e(texto)}</p>" if texto else "") + "</section>", unsafe_allow_html=True)
 
 
 def descargar(df: pd.DataFrame, nombre: str, etiqueta="Descargar CSV"):
