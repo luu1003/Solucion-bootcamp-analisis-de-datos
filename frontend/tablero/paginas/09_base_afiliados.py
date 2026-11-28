@@ -37,7 +37,7 @@ c.kpi(k[4], "Tasa de renovación", c.fmt(renov["tasa"], 1, " %"), renov["nota"],
       chip_=("Alerta", f"Meta 2027: {c.fmt(c.METAS_2027['renovacion'], 0)} %"),
       ayuda_=c.ayuda("Tasa de renovación (medida)" if renov["tipo"] == "medida" else "Tasa de renovación (aproximada)"))
 
-principal, lateral = st.columns([3.2, 1], gap="medium")
+principal, lateral = c.columnas([3.2, 1], "lateral", gap="medium")
 with principal:
     with c.tarjeta():
         e_m, _, _ = c.datos(excluir=("mes_alta",))
@@ -83,7 +83,7 @@ with principal:
     alt = ia.pronostico("altas")
     vproy = ia.pronostico("vigentes")
     if len(alt) and len(vproy):
-        g1, g2 = st.columns(2)
+        g1, g2 = c.columnas(2, "pareja")
         with g1, c.tarjeta():
             h = alt[(alt["tipo"] == "historia") & (alt["mes"] >= corte - pd.DateOffset(months=36))]
             f = alt[alt["tipo"] == "pronostico"]
@@ -136,10 +136,10 @@ with principal:
             sub = "Vigentes · clic para filtrar" + (f" · {c.fmt(resto)} en otras categorías" if resto else "")
             c.grafico(fig, max(220, 30 * len(d) + 70), sub, dims=[dim], clave=f"comp_{dim}")
 
-    f1, f2 = st.columns(2)
+    f1, f2 = c.columnas(2, "pareja")
     composicion(f1, "tipo_membresia", "Por tipo de afiliado")
     composicion(f2, "tamano_empresa", "Por tamaño de empresa")
-    f3, f4 = st.columns(2)
+    f3, f4 = c.columnas(2, "pareja")
     composicion(f3, "sector", "Por sector (10 principales)", top=10)
     composicion(f4, "ciudad", "Por ciudad (10 principales)", top=10)
 

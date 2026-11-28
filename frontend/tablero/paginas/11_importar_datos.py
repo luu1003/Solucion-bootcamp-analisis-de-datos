@@ -45,7 +45,7 @@ def _procesando() -> bool:
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. Tipo de dato
 # ──────────────────────────────────────────────────────────────────────────────
-izq, der = st.columns([1.15, 1], gap="medium")
+izq, der = c.columnas([1.15, 1], "pareja", gap="medium")
 with izq, c.tarjeta("1. ¿Qué datos vas a subir?", "Cada tipo tiene su plantilla con el mismo formato que ACTHO ya usa"):
     nombres = {t: d["nombre"] for t, d in imp.TIPOS.items()}
     tipo = st.radio("Tipo de datos", list(nombres), format_func=nombres.get, key="imp_tipo",
@@ -155,13 +155,13 @@ with c.tarjeta("3. Carga los datos", "Sube la plantilla llena o escribe los dato
                 cual = st.selectbox("¿A qué evento pertenecen los inscritos?", etiquetas, key="imp_ev_sel",
                                     help="Elige un evento que ya existe para sumarle inscritos, o crea uno nuevo.")
                 base = {} if cual == "Evento nuevo" else eventos.iloc[etiquetas.index(cual) - 1].to_dict()
-                e1, e2 = st.columns([2.2, 1])
+                e1, e2 = c.columnas([2.2, 1], "controles")
                 nombre_ev = e1.text_input("Nombre del evento", base.get("nombre", ""), key=f"imp_ev_nombre_{cual}",
                                           disabled=cual != "Evento nuevo")
                 fecha_ev = e2.date_input("Fecha", pd.Timestamp(base["fecha"]).date() if base.get("fecha") is not None
                                          else pd.Timestamp.today().date(), format="DD/MM/YYYY",
                                          key=f"imp_ev_fecha_{cual}", disabled=cual != "Evento nuevo")
-                e3, e4, e5 = st.columns(3)
+                e3, e4, e5 = c.columnas([1, 1, 1], "controles")
                 sel = {}
                 for col_, campo, et in ((e3, "linea_2027", "Línea 2027"), (e4, "experiencia", "Experiencia"),
                                         (e5, "modalidad", "Modalidad")):

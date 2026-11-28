@@ -36,10 +36,11 @@ salud = round(100 - 100 * (emp["puntaje_riesgo"] or 0) / 9) if vigente else None
 
 # Encabezado de la empresa
 st.markdown(
-    f'<div class="kpi" style="padding:1.1rem 1.3rem"><div><span style="font-size:1.5rem;font-weight:700;color:{c.C["morado"]}">{emp_id}</span> &nbsp; '
-    f'{c.chip_semaforo(emp["semaforo"])} {c.chip(emp["estado_membresia"], "morado")} {c.chip(emp["nivel_2027"])}'
-    f'<div class="subtitulo" style="margin-top:.4rem">{emp["tipo_membresia"]} · {emp["sector"]} · {emp["ciudad"]} · '
-    f'Ejecutiva: <b>{emp["ejecutiva"]}</b> · Afiliada desde {c.fecha_txt(emp["fecha_afiliacion"])}</div></div></div>',
+    f'<section class="kpi ficha-empresa" aria-label="Empresa {c._e(emp_id)}"><div class="linea">'
+    f'<h2 class="empresa-id">{c._e(emp_id)}</h2>'
+    f'{c.chip_semaforo(emp["semaforo"])} {c.chip(emp["estado_membresia"], "morado")} {c.chip(emp["nivel_2027"])}</div>'
+    f'<p class="subtitulo">{emp["tipo_membresia"]} · {emp["sector"]} · {emp["ciudad"]} · '
+    f'Ejecutiva: <b>{emp["ejecutiva"]}</b> · Afiliada desde {c.fecha_txt(emp["fecha_afiliacion"])}</p></section>',
     unsafe_allow_html=True)
 
 k = c.fila(5)
@@ -59,9 +60,9 @@ c.kpi(k[3], "Personas que participan", c.fmt(emp["personas_distintas"]), f"{c.fm
 prom_general = enc["satisfaccion_general"].fillna(enc["satisfaccion_prom"]).mean()
 c.kpi(k[4], "Satisfacción", c.fmt(emp["satisfaccion_promedio"], 2), f"Promedio general {c.fmt(prom_general, 2)}")
 
-izq, der = st.columns([2.2, 1], gap="medium")
+izq, der = c.columnas([2.2, 1], "lateral", gap="medium")
 with izq:
-    g1, g2 = st.columns([1, 1.25])
+    g1, g2 = c.columnas([1, 1.25], "pareja")
     with g1:
         with c.tarjeta():
             comp = pd.DataFrame({"Componente": ["Vencimiento", "Participación", "Satisfacción"],
@@ -128,7 +129,7 @@ with izq:
         else:
             st.caption("Sin asistencias registradas.")
 
-    p1, p2 = st.columns(2)
+    p1, p2 = c.columnas(2, "pareja")
     with p1:
         with c.tarjeta():
             c.cabeza("Personas de la empresa")
@@ -216,18 +217,18 @@ with der, c.tarjeta("Apoyo de IA", "Lo que sugieren los modelos para esta empres
             r = r.iloc[0]
             color = ia.BANDA_COLOR.get(r["banda"], c.C["morado"])
             st.markdown(
-                f'<div style="display:flex;align-items:baseline;gap:.6rem"><span style="font-size:2rem;font-weight:700;'
-                f'color:{color}">{100 * r["p_renovar"]:.0f} %</span><span>probabilidad de renovar{ia.info("renovacion")}</span></div>'
+                f'<p class="probabilidad" style="--color:{color}"><span class="valor">{100 * r["p_renovar"]:.0f} %</span>'
+                f'<span>probabilidad de renovar{ia.info("renovacion")}</span></p>'
                 f'{ia.chip(r["banda"])}'
-                + (f'<p style="margin:.5rem 0 .1rem;font-size:.8rem"><b>A favor</b></p><ul style="margin:0;font-size:.8rem">'
-                   f'{_lista(r["a_favor"])}</ul>' if r["a_favor"] else "")
-                + (f'<p style="margin:.4rem 0 .1rem;font-size:.8rem"><b>En contra</b></p><ul style="margin:0;font-size:.8rem">'
-                   f'{_lista(r["en_contra"])}</ul>' if r["en_contra"] else ""),
+                + (f'<h3 class="lista-titulo">A favor</h3><ul class="lista-ia">{_lista(r["a_favor"])}</ul>'
+                   if r["a_favor"] else "")
+                + (f'<h3 class="lista-titulo">En contra</h3><ul class="lista-ia">{_lista(r["en_contra"])}</ul>'
+                   if r["en_contra"] else ""),
                 unsafe_allow_html=True)
             lectura = {"Probable": "suele renovar: mantén la relación y pide referidos.",
                        "Incierta": "puede ir para cualquier lado: conviene una conversación de valor antes del vencimiento.",
                        "En riesgo": "se parece más a las que no renovaron: priorízala y ataca los factores en contra."}
-            st.markdown(f'<p style="font-size:.78rem;margin:.5rem 0 .2rem"><b>Cómo leerlo:</b> {r["banda"]} — '
+            st.markdown(f'<p class="como-leerlo"><b>Cómo leerlo:</b> {r["banda"]} — '
                         f'{lectura.get(r["banda"], "")} El porcentaje sale de compararla con las 503 empresas que ya '
                         'decidieron en el último año. Si sabes algo que los datos no muestran (cambio de gerente, una queja, '
                         'recorte de presupuesto), tu criterio pesa más.</p>', unsafe_allow_html=True)
@@ -252,8 +253,8 @@ with der, c.tarjeta("Apoyo de IA", "Lo que sugieren los modelos para esta empres
             info = ren.set_index("empresa_id")["banda"] if len(ren) else {}
             filas = [{"e": x.parecida_id, "s": f"{100 * x.similitud:.0f}",
                       "b": ia.chip(info.get(x.parecida_id, "—")) if len(ren) else ""} for x in par.itertuples()]
-            st.markdown('<p style="margin:.6rem 0 .2rem;font-size:.8rem"><b>Empresas parecidas</b> (misma forma de '
-                        'usar la membresía)</p>', unsafe_allow_html=True)
+            st.markdown('<h3 class="lista-titulo">Empresas parecidas <span class="detalle">(misma forma de '
+                        'usar la membresía)</span></h3>', unsafe_allow_html=True)
             c.tabla_html(filas, [("Empresa", "e", "texto"), ("Parecido", "s", "num"), ("Renovación", "b", "html")])
             def _abrir():
                 v = st.session_state.get("ficha_parecida")

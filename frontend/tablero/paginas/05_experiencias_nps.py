@@ -34,9 +34,9 @@ c.kpi(k[3], "Satisfacción", c.fmt(r_sat.mean(), 2), f"Promedio 1-5 de {c.fmt(le
 c.kpi(k[4], "NPS de eventos", ("+" if (nps_v or 0) > 0 else "") + c.fmt(nps_v, 0), f"{c.fmt(nps_n)} respuestas con NPS",
       chip_=("OK" if (nps_v or 0) >= 55 else "Alerta", "Meta 2027: +55"))
 
-izq, der = st.columns([2.3, 1], gap="medium")
+izq, der = c.columnas([2.3, 1], "lateral", gap="medium")
 with izq:
-    g1, g2 = st.columns(2)
+    g1, g2 = c.columnas(2, "pareja")
     with g1:
         with c.tarjeta():
             dims = ["linea_2027", "condicion_empresa"]
@@ -81,7 +81,7 @@ with izq:
         st.caption("Las encuestas no registran el evento: se asigna por fecha y modalidad. "
                    "Las respuestas de 2025 no corresponden a eventos de 2026.")
 
-    g3, g4 = st.columns(2)
+    g3, g4 = c.columnas(2, "pareja")
     with g3:
         with c.tarjeta():
             asp = pd.DataFrame({
@@ -118,7 +118,7 @@ with izq:
                  "Mide la relación con la asociación y la intención de renovar, no un evento")
         rel = c.relacion()
         if len(rel):
-            rel = rel[pd.to_datetime(rel["fecha"]).between(*c.periodo())] if c.periodo()[0] is not None else rel
+            rel = rel[c.dentro_del_periodo(rel["fecha"])]
             if c.hay_filtros_empresa():
                 rel = rel[rel["empresa_id"].isin(set(c.filtrar_empresas(c.empresas())["empresa_id"]))]
         pe = c.tabla("v_encuesta_90d_por_enviar") if c.existe("actho.v_encuesta_90d_por_enviar") else pd.DataFrame()
@@ -135,7 +135,7 @@ with izq:
         c.kpi(kk[3], "Por encuestar", c.fmt(len(pe)), "Cumplen 90 días o renuevan en ~60 días",
               chip_=("Alerta" if len(pe) else "OK", "Enviar desde Segmentos" if len(pe) else "Al día"))
         if n:
-            g1_, g2_ = st.columns(2)
+            g1_, g2_ = c.columnas(2, "pareja")
             with g1_:
                 cat_ = rel["nps_categoria"].value_counts().reindex(["Detractor", "Pasivo", "Promotor"]).fillna(0).reset_index()
                 cat_.columns = ["Categoría", "Respuestas"]

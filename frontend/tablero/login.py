@@ -25,9 +25,11 @@ div.st-key-login_lienzo [data-testid="stHorizontalBlock"] {{ min-height: calc(10
 .login-hero {{ padding: 3rem 2rem 3rem 12%; position: relative; z-index: 1; display: flex; flex-direction: column; }}
 .login-logo {{ font-size: 2.1rem !important; font-weight: 600 !important; letter-spacing: -.04em; color: #fff !important; line-height: 1 !important; margin: 0 0 2.2rem !important; }}
 .login-logo span {{ color: {c.C['naranja']}; }}
+.login-hero [data-testid="stHeaderActionElements"], .login-titulo [data-testid="stHeaderActionElements"] {{ display: none !important; }}
 .login-h1 {{ font-size: clamp(2.8rem, 4.6vw, 4.4rem) !important; line-height: 1.02 !important; font-weight: 700 !important;
-  color: #FFFFFF !important; letter-spacing: -.035em; margin: 0 0 1.4rem !important; }}
-.login-h1 span {{ color: {c.C['naranja']}; }}
+  color: #FFFFFF !important; letter-spacing: -.035em; margin: 0 0 1.4rem !important; padding: 0 !important; }}
+.login-h1, .login-h1 * {{ color: #FFFFFF !important; }}
+.login-h1 .acento {{ color: {c.C['naranja']} !important; }}
 .login-lema {{ font-size: 1.35rem !important; font-weight: 600 !important; color: #FFFFFF !important; line-height: 1.3 !important;
   margin: 0 0 .7rem !important; max-width: 520px; }}
 .login-lema em {{ font-style: normal; color: {c.C['cian']}; }}
@@ -42,7 +44,7 @@ div.st-key-login_tarjeta {{ position: relative; z-index: 2; background: #FFFFFF;
   padding: 2.4rem 2.2rem 1.6rem !important; box-shadow: 0 24px 60px rgba(43, 10, 107, .28);
   width: auto !important; max-width: 430px; margin: 2rem auto !important; }}
 .login-titulo {{ font-size: 1.75rem !important; font-weight: 700 !important; color: {c.C['tinta']} !important; margin: 0 !important;
-  line-height: 1.15 !important; }}
+  line-height: 1.15 !important; padding: 0 !important; }}
 .login-sub {{ font-size: .92rem !important; color: {c.C['gris']} !important; margin: .3rem 0 1.3rem !important; }}
 div.st-key-login_tarjeta [data-testid="stWidgetLabel"] p {{ text-transform: none !important; letter-spacing: 0 !important;
   font-size: .88rem !important; font-weight: 500 !important; color: {c.C['tinta']} !important; }}
@@ -74,12 +76,12 @@ def pantalla_login():
     st.markdown(CSS_LOGIN, unsafe_allow_html=True)
     estado = st.session_state.setdefault("login_estado", {})
     with st.container(key="login_lienzo"):
-        izq, der = st.columns([1.3, 1])
+        izq, der = c.columnas([1.3, 1], "lateral")
         with izq:
             st.markdown(
                 '<div class="login-hero">'
                 '<p class="login-logo" aria-label="actho">ac<span>tho</span></p>'
-                '<p class="login-h1" role="heading" aria-level="1">¡Bienvenido<br>a ac<span>tho</span>!</p>'
+                '<h1 class="login-h1">¡Bienvenido<br>a ac<span class="acento">tho</span>!</h1>'
                 '<p class="login-lema">Sentimos el pulso de tus afiliados <em>desde un solo lugar.</em></p>'
                 '<p class="login-desc">Membresías, renovaciones, participación en experiencias y satisfacción de la base '
                 'de afiliados, integradas para actuar a tiempo.</p>'
@@ -88,7 +90,7 @@ def pantalla_login():
                 '<p class="login-copy">© 2026 ACTHO</p>'
                 '</div>', unsafe_allow_html=True)
         with der, st.container(key="login_tarjeta"):
-            st.markdown('<p class="login-titulo">Iniciar sesión</p>'
+            st.markdown('<h2 class="login-titulo">Iniciar sesión</h2>'
                         '<p class="login-sub">Accede al tablero integral de afiliados.</p>', unsafe_allow_html=True)
             espera = auth.bloqueado(estado)
             with st.form("form_login", border=False, clear_on_submit=False):

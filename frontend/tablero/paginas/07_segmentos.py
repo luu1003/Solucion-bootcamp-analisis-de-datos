@@ -31,7 +31,7 @@ for i, (nombre, fila) in enumerate(res.iterrows()):
     if i % 4 == 3:
         cols = c.fila(4)
 
-izq, der = st.columns([2.2, 1], gap="medium")
+izq, der = c.columnas([2.2, 1], "lateral", gap="medium")
 with izq:
     with c.tarjeta():
         c.cabeza("Lista para campaña", "Elige el segmento y exporta solo a quienes autorizaron")

@@ -38,7 +38,7 @@ def opciones(col):
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. Diseño del evento
 # ──────────────────────────────────────────────────────────────────────────────
-izq, der = st.columns([1.05, 2.3], gap="medium")
+izq, der = c.columnas([1.05, 2.3], "lateral", gap="medium")
 with izq, c.tarjeta("Diseña el evento", "Cambia cualquier dato y la estimación se actualiza"):
     nombre = st.text_input("Nombre del evento", "Nuevo evento", max_chars=120)
     fecha = st.date_input("Fecha", value=max(date.today(), corte.date()) + timedelta(days=30), format="DD/MM/YYYY")
@@ -104,7 +104,7 @@ with der:
         c.grafico(fig, 300)
 
     cargos = {k_: v_ for k_, v_ in r["cargos"].items() if v_ and k_ not in ("Sin dato",)}
-    g1, g2 = st.columns(2)
+    g1, g2 = c.columnas(2, "pareja")
     with g1, c.tarjeta("Quiénes vendrían", "Nivel de cargo esperado (% de inscritos)"):
         d = pd.Series(cargos).sort_values()
         fig = go.Figure(go.Bar(x=d.values, y=[c.partir(i, 22) for i in d.index], orientation="h",
@@ -147,7 +147,7 @@ with der:
 # ──────────────────────────────────────────────────────────────────────────────
 # 2. Demanda del tema
 # ──────────────────────────────────────────────────────────────────────────────
-d1, d2 = st.columns([1.6, 1], gap="medium")
+d1, d2 = c.columnas([1.6, 1], "lateral", gap="medium")
 with d1, c.tarjeta("Lo que piden frente a lo que ofrecemos",
                    "% de solicitudes en encuestas y % de eventos de 2026 por tema · el tema elegido resaltado",
                    ayuda=ia.desc("temas")):
@@ -194,7 +194,7 @@ with d2, c.panel():
 with c.tarjeta("Convocatoria sugerida", "Personas con interés en el tema que autorizaron el uso de sus datos",
                ayuda="Interés = eventos del tema a los que asistió + 2 × veces que lo pidió en encuestas (tema leído con IA). "
                      "Primero quienes trabajan en afiliadas con baja probabilidad de renovar."):
-    f1, f2, f3 = st.columns([2, 1.2, 1])
+    f1, f2, f3 = c.columnas([2, 1.2, 1], "controles")
     niveles = sorted(interes["nivel_cargo"].dropna().unique()) if not interes.empty else []
     publico = f1.multiselect("Público objetivo (nivel de cargo)", niveles,
                              default=[n for n in niveles if n not in ("Estudiante / Practicante", "Otro", "Sin dato")])
@@ -255,7 +255,7 @@ def guardar_plan():
 
 
 with c.tarjeta("Planes guardados", "Guarda la simulación; cuando el evento ocurra se compara con lo real"):
-    b1, b2 = st.columns([1, 3])
+    b1, b2 = c.columnas([1, 3], "controles")
     if b1.button("Guardar este plan", type="primary", icon=":material/save:"):
         try:
             guardar_plan()
