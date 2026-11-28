@@ -19,10 +19,13 @@ def _paquete_powerbi(ini, fin, corte):
     e = c.empresas()
     a, r, u = c.asistencia(), c.encuestas(), c.uso_beneficios()
     if ini is not None:
-        a = a[(a["fecha_evento"] >= ini) & (a["fecha_evento"] <= fin)]
-        r = r[(pd.to_datetime(r["fecha_respuesta"]) >= ini) & (pd.to_datetime(r["fecha_respuesta"]) <= fin)]
+        fin_dia = fin + pd.Timedelta(days=1)          # incluye el último día completo (las respuestas traen hora)
+        fa = pd.to_datetime(a["fecha_evento"])
+        a = a[(fa >= ini) & (fa < fin_dia)]
+        fr = pd.to_datetime(r["fecha_respuesta"])
+        r = r[(fr >= ini) & (fr < fin_dia)]
         fu = pd.to_datetime(u["fecha"])
-        u = u[((fu >= ini) & (fu <= fin)) | (u["es_fechado"] == 0)]
+        u = u[((fu >= ini) & (fu < fin_dia)) | (u["es_fechado"] == 0)]
     nota = f"; eventos y encuestas del {ini:%d/%m/%Y} al {fin:%d/%m/%Y}" if ini is not None else ""
     return powerbi.construir_zip(powerbi.preparar_datos(e, a, r, u, corte), corte, nota, tema_base=powerbi.tema_base_local())
 
@@ -60,7 +63,7 @@ nps = (100 * ((r["nps_categoria"] == "Promotor").sum() - (r["nps_categoria"] == 
 v90 = vig[vig["dias_a_vencer"].between(0, 90)]
 rojos = (vig["semaforo"] == "Rojo").sum()
 
-principal, lateral = st.columns([3.2, 1], gap="medium")
+principal, lateral = c.columnas([3.2, 1], "lateral", gap="medium")
 with principal:
     m1, m2, m3 = c.fila(3)
     tasa = renov["tasa"]
@@ -102,7 +105,7 @@ with principal:
           chip_=("Alerta", f"{c.fmt((vig['semaforo'] == 'Amarillo').sum())} con riesgo medio"),
           ayuda_=c.ayuda("Riesgo de no renovar (semáforo)"))
 
-    g1, g2 = st.columns([1.35, 1])
+    g1, g2 = c.columnas([1.35, 1], "pareja")
     with g1:
         with c.tarjeta():
             dims = ["mes_venc", "semaforo"]
@@ -159,7 +162,7 @@ with principal:
         else:
             st.info("No hay renovaciones en los próximos 90 días con los filtros actuales.")
 
-    g5, g6 = st.columns([1.35, 1])
+    g5, g6 = c.columnas([1.35, 1], "pareja")
     with g5:
         with c.tarjeta():
             u5 = c.datos_uso(excluir=("servicio", "fuente"))
@@ -200,7 +203,7 @@ with principal:
             fig.update_xaxes(title="", showticklabels=False, showgrid=False, range=[0, max(niv["vigentes"].max(), 1) * 1.25])
             c.grafico(fig, 300, "Empresas vigentes · Conectar, Crecer y Liderar · clic para filtrar", dims=["nivel_2027"], clave="nivel")
 
-    g3, g4 = st.columns(2)
+    g3, g4 = c.columnas(2, "pareja")
     with g3:
         with c.tarjeta():
             dims = ["anio_mes", "condicion_empresa"]

@@ -23,7 +23,7 @@ tab1, tab2, tab3 = st.tabs(["Alertas", "Factores de retención", "Simulador de c
 with tab1:
     hist = c.tabla("evaluacion_riesgo", "historial") if c.existe("historial.evaluacion_riesgo") else pd.DataFrame()
     fechas = sorted(hist["fecha_corte"].unique()) if len(hist) else []
-    izq, der = st.columns([2.2, 1], gap="medium")
+    izq, der = c.columnas([2.2, 1], "lateral", gap="medium")
     with izq, c.tarjeta():
         if len(fechas) >= 2:
             ult, ant = fechas[-1], fechas[-2]
@@ -67,7 +67,7 @@ with tab1:
 with tab2:
     st.caption("Asociaciones observadas en los datos, no causas: una empresa que ya decidió irse tampoco asiste.")
     crm = todas[(todas["en_crm"] == 1) & (todas["estado_membresia"] != "Sin estado")].copy()
-    g1, g2, g3 = st.columns(3)
+    g1, g2, g3 = c.columnas(3, "pareja")
     def barra(col, df, x, titulo, sub=None):
         t = df.groupby(x, observed=False).agg(empresas=("empresa_id", "count"), vigentes=("es_vigente", "sum")).reset_index()
         t["% vigente"] = (100 * t["vigentes"] / t["empresas"]).round(1)
@@ -91,7 +91,7 @@ with tab2:
     coef = ia.t("renovacion_coef")
     ren = ia.renovacion()
     if len(coef) and len(ren):
-        h1, h2 = st.columns([1.2, 1], gap="medium")
+        h1, h2 = c.columnas([1.2, 1], "pareja", gap="medium")
         with h1, c.tarjeta("Qué pesa en la probabilidad de renovar", "✦ Modelo de IA · efecto de cada factor manteniendo los demás fijos"):
             d = coef.sort_values("coeficiente")
             d["Etiqueta"] = d["etiqueta"].map(lambda t_: c.partir(t_, 30))
@@ -126,7 +126,7 @@ with tab2:
 with tab3:
     st.markdown("Ajusta los criterios y mira cómo cambiaría el semáforo **antes** de cambiarlo en la base "
                 "(`actho.config_parametro`). Es la propuesta de umbrales para validar con Dirección.")
-    s1, s2, s3 = st.columns(3)
+    s1, s2, s3 = c.columnas(3, "pareja")
     with s1, c.tarjeta():
         c.cabeza("Vencimiento", "Puntos según días para vencer")
         pv30 = st.slider("Vence en 0-30 días o vencida", 0, 5, int(p["pts_vence_30"]))
@@ -162,7 +162,7 @@ with tab3:
                          "Actual": [(vig["semaforo"] == s).sum() for s in ["Rojo", "Amarillo", "Verde"]],
                          "Simulado": [(nuevo == s).sum() for s in ["Rojo", "Amarillo", "Verde"]]})
     larga = comp.melt("Riesgo", var_name="Escenario", value_name="Empresas")
-    g1, g2 = st.columns([1.4, 1])
+    g1, g2 = c.columnas([1.4, 1], "pareja")
     with g1:
         with c.tarjeta():
             fig = px.bar(larga, x="Riesgo", y="Empresas", color="Escenario", barmode="group", text="Empresas",

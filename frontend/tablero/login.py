@@ -23,15 +23,16 @@ div.st-key-login_lienzo [data-testid="stHorizontalBlock"] {{ min-height: 760px; 
 .login-hero h1 {{ font-size: 5rem !important; line-height: 1.02 !important; font-weight: 700 !important; color: #FFFFFF !important;
   letter-spacing: -.035em; margin: 0 0 1.6rem !important; padding: 0 !important; }}
 .login-hero h1 span {{ color: {c.C['naranja']}; }}
-.login-hero h2 {{ font-size: 1.45rem !important; font-weight: 600 !important; color: #FFFFFF !important; line-height: 1.3 !important;
+.login-hero .login-lema {{ font-size: 1.45rem !important; font-weight: 600 !important; color: #FFFFFF !important; line-height: 1.3 !important;
   margin: 0 0 .7rem !important; padding: 0 !important; max-width: 560px; }}
-.login-hero h2 em {{ font-style: normal; color: {c.C['cian']}; }}
+.login-hero .login-lema em {{ font-style: normal; color: {c.C['cian']}; }}
 .login-hero p {{ font-size: 1.05rem; color: {c.C['lavanda_2']}; max-width: 560px; line-height: 1.5; margin: 0; }}
 .login-pie {{ display:flex; gap: 1.4rem; flex-wrap: wrap; margin-top: 4.5rem; }}
 .login-pie span {{ font-size: .72rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #FFFFFF; }}
 div.st-key-login_tarjeta {{ background: #FFFFFF; border-radius: 22px; padding: 2.6rem 2.4rem 1.8rem !important;
   box-shadow: 0 24px 60px rgba(43, 10, 107, .25); margin: 0 9% 0 4%; }}
-.login-titulo {{ font-size: 2rem !important; font-weight: 700 !important; color: {c.C['tinta']} !important; margin: 0 !important; line-height: 1.1 !important; }}
+.login-titulo {{ font-size: 2rem !important; font-weight: 700 !important; color: {c.C['tinta']} !important; margin: 0 !important; padding: 0 !important; line-height: 1.1 !important; }}
+.login-hero [data-testid="stHeaderActionElements"], .login-titulo [data-testid="stHeaderActionElements"] {{ display: none !important; }}
 .login-sub {{ font-size: .95rem !important; color: {c.C['gris']} !important; margin: .35rem 0 1.4rem !important; }}
 div.st-key-login_tarjeta [data-testid="stWidgetLabel"] p {{ text-transform: none !important; letter-spacing: 0 !important;
   font-size: .9rem !important; font-weight: 500 !important; color: {c.C['tinta']} !important; }}
@@ -52,6 +53,10 @@ div.st-key-login_tarjeta [data-testid="stFormSubmitButton"] button:hover {{ back
   div.st-key-login_lienzo {{ background: {c.C['morado']}; }}
   .login-hero h1 {{ font-size: 3.2rem !important; }}
   div.st-key-login_tarjeta {{ margin: 1rem 1rem 2rem; }}
+  .login-cinta {{ display: none; }}
+  div.st-key-login_lienzo [data-testid="stHorizontalBlock"] {{ min-height: 0; }}
+  .login-hero {{ padding: 2.5rem 2rem 1rem; }}
+  .login-pie {{ margin-top: 2rem; }}
 }}
 </style>
 """
@@ -62,20 +67,20 @@ def pantalla_login():
     estado = st.session_state.setdefault("login_estado", {})
     with st.container(key="login_lienzo"):
         st.markdown(f'<img class="login-cinta" src="{c.CINTA_URI}" alt="">', unsafe_allow_html=True)
-        izq, der = st.columns([1.35, 1])
+        izq, der = c.columnas([1.35, 1], "lateral")
         with izq:
             st.markdown(
                 '<div class="login-hero">'
                 '<div class="logo">ac<span>tho</span></div>'
                 '<h1>¡Bienvenido<br>a ac<span>tho</span>!</h1>'
-                '<h2>Sentimos el pulso de tus afiliados <em>desde un solo lugar.</em></h2>'
+                '<p class="login-lema">Sentimos el pulso de tus afiliados <em>desde un solo lugar.</em></p>'
                 '<p>Membresías, renovaciones, participación en experiencias y satisfacción de la base de afiliados, '
                 'integradas para actuar a tiempo.</p>'
                 '<div class="login-pie"><span>Afiliados</span><span>Renovación y retención</span>'
                 '<span>Experiencias y NPS</span><span>© 2026 ACTHO</span></div>'
                 '</div>', unsafe_allow_html=True)
         with der, st.container(key="login_tarjeta"):
-            st.markdown('<p class="login-titulo">Iniciar sesión</p>'
+            st.markdown('<h2 class="login-titulo">Iniciar sesión</h2>'
                         '<p class="login-sub">Accede al tablero integral de afiliados.</p>', unsafe_allow_html=True)
             espera = auth.bloqueado(estado)
             with st.form("form_login", border=False, clear_on_submit=False):

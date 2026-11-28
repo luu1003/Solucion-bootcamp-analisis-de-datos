@@ -1,0 +1,333 @@
+/*
+  ACTHO · Tablero integral de afiliados — hoja de estilos.
+  Los colores vienen de las variables --morado, --naranja-texto… que comun.py genera desde
+  el diccionario C (una sola fuente de verdad para Python, Plotly y CSS). La cinta naranja es --cinta.
+*/
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+/* ── Escala de espacios y radios ─────────────────────────────────────────────────
+   Todos los contenedores usan estos valores, para que las distancias sean iguales en todo el tablero.
+   Base de 4 px (0,25 rem). Para cambiar un espacio en todo el tablero, se cambia aquí. */
+:root {
+  --esp-1: .25rem;   /*  4 px */
+  --esp-2: .5rem;    /*  8 px */
+  --esp-3: .75rem;   /* 12 px */
+  --esp-4: 1rem;     /* 16 px */
+  --esp-5: 1.25rem;  /* 20 px */
+  --esp-6: 1.5rem;   /* 24 px */
+  --esp-8: 2rem;     /* 32 px */
+  --separacion: var(--esp-4);                   /* entre bloques, tarjetas, filas y columnas */
+  --relleno-tarjeta: var(--esp-4) var(--esp-5);  /* dentro de tarjetas, KPIs y metas */
+  --radio-tarjeta: 1.25rem;  /* 20 px: tarjetas, paneles, KPIs */
+  --radio-interno: .875rem;  /* 14 px: tarjetas dentro de paneles, avisos */
+  --radio-control: .75rem;   /* 12 px: campos, tablas, recuadros pequeños */
+  --radio-pildora: 999px;    /* botones, pestañas, chips y píldoras */
+}
+html, body, .stApp, [class*="css"], .stMarkdown, p, span, label, button, input, textarea, select, li, div {
+  font-family: 'Poppins', sans-serif; }
+code { font-family: ui-monospace, monospace !important; }
+.stApp { background: var(--menta); }
+header[data-testid="stHeader"] { background: transparent; }
+.block-container { padding: var(--esp-4) var(--esp-4) var(--esp-8) !important; max-width: 1480px; }
+[data-testid="stVerticalBlock"] { gap: var(--separacion); }
+
+/* ── Barra lateral (componente Sidebar) ── */
+[data-testid="stSidebar"] { background: var(--morado); border-right: none; }
+[data-testid="stSidebar"] > div:first-child { background: var(--cinta) no-repeat right -34px bottom 64px / 118px auto; }
+[data-testid="stSidebar"] * { color: #FFFFFF; }
+[data-testid="stSidebarNav"] { padding-top: .2rem; }
+[data-testid="stSidebarNav"] a { border-radius: var(--radio-pildora); padding: .3rem .85rem !important; margin: 1px 0 !important; min-height: 0 !important; line-height: 1.6; }
+[data-testid="stSidebarNav"] li { margin: 0 !important; }
+[data-testid="stSidebarNav"] a span { font-size: .9rem; font-weight: 500; color: #FFFFFF !important; }
+[data-testid="stSidebarNav"] a:hover { background: rgba(255,255,255,.12); }
+[data-testid="stSidebarNav"] a[aria-current="page"] { background: #FFFFFF; }
+[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"],
+[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] * { color: var(--morado) !important; }
+[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] span { font-weight: 600 !important; }
+[data-testid="stNavSectionHeader"], [data-testid="stSidebarNav"] header, [data-testid="stSidebarNavSeparator"] + * { }
+[data-testid="stNavSectionHeader"] { color: var(--cian-claro) !important; font-size: .72rem !important; font-weight: 600 !important;
+  letter-spacing: .08em; text-transform: uppercase; margin-top: .8rem !important; }
+[data-testid="stNavSectionHeader"] * { color: var(--cian-claro) !important; }
+[data-testid="stSidebarNavSeparator"] { border-color: rgba(255,255,255,.2); }
+[data-testid="stSidebarHeader"] { padding-top: 1.4rem; padding-bottom: .4rem; }
+[data-testid="stSidebarHeader"] img, [data-testid="stLogo"] { height: 2.9rem !important; max-width: 9rem; }
+[data-testid="stSidebar"] [data-testid="stExpander"] details { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); border-radius: var(--radio-interno); }
+[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover { color: #fff; }
+[data-testid="stSidebar"] [data-baseweb="select"] > div, [data-testid="stSidebar"] [data-baseweb="input"] { background: #fff; border-radius: var(--radio-control); }
+[data-testid="stSidebar"] [data-baseweb="select"] *, [data-testid="stSidebar"] input,
+[data-testid="stSidebar"] [data-baseweb="tag"] * { color: var(--tinta) !important; }
+[data-testid="stSidebar"] [data-baseweb="tag"] { background: var(--lavanda) !important; }
+[data-testid="stSidebar"] .stButton button { background: transparent; border: 1px solid rgba(255,255,255,.6); }
+.lema-lateral { color: var(--cian-claro); font-size: .8rem; font-weight: 500; margin: -.2rem 0 .2rem; }
+.usuario { display:flex; align-items:center; gap:.65rem; border-top: 1px solid rgba(255,255,255,.2); padding-top: .9rem; margin-top: .6rem; }
+.usuario .avatar { width: 36px; height: 36px; border-radius: 50%; background: #fff; color: var(--morado) !important;
+  display:flex; align-items:center; justify-content:center; font-weight: 700; font-size: .8rem; }
+.usuario b { display:block; font-size: .85rem; font-weight: 600; } .usuario small { font-size: .72rem; color: var(--lavanda-2) !important; }
+
+/* ── Encabezado de página ── */
+.titulo { font-size: 1.75rem !important; font-weight: 700 !important; color: var(--tinta) !important; margin: 0 !important; padding: 0 !important; line-height: 1.15 !important; letter-spacing: -.01em; }
+.subtitulo { color: var(--gris) !important; margin: .2rem 0 0 !important; font-size: .9rem !important; }
+.pildoras { display:flex; gap: var(--esp-2); flex-wrap:wrap; justify-content:flex-end; list-style: none; margin: 0 !important; padding: var(--esp-1) 0 0 !important; }
+.pildoras li { margin: 0 !important; }
+.pildora { display:inline-flex; align-items:center; gap:.45rem; border-radius: var(--radio-pildora); padding: .42rem .9rem .42rem .7rem;
+  font-size: .72rem; font-weight: 500; letter-spacing: .02em; text-transform: uppercase; background: #fff;
+  border: 1px solid var(--linea); color: var(--tinta); white-space: nowrap; }
+.pildora b { font-weight: 700; }
+.pildora i { width: 9px; height: 9px; border-radius: 50%; display:inline-block; background: var(--gris); }
+.pildora.ok i { background: var(--cian-graf); } .pildora.alerta i { background: var(--naranja); }
+.pildora.riesgo i { background: var(--naranja); } .pildora.morado i { background: var(--morado); }
+
+/* ── Tarjetas (contenedores con borde) ── */
+div[class*="st-key-tarjeta"] { background:#FFFFFF !important; border:none !important; border-radius: var(--radio-tarjeta) !important;
+  padding: var(--relleno-tarjeta) !important; box-shadow: none !important; }
+div[class*="st-key-tarjeta"] div[class*="st-key-tarjeta"] { padding: var(--esp-2) 0 0 !important; }
+[data-testid="stVerticalBlockBorderWrapper"]:has(> div > [data-testid="stVerticalBlock"]) { }
+div[data-testid="stVerticalBlockBorderWrapper"][data-test-scroll-behavior], div[class*="st-key-tarjeta"],
+[data-testid="stVerticalBlockBorderWrapper"] { border-radius: var(--radio-tarjeta) !important; }
+[data-testid="stVerticalBlockBorderWrapper"]:not(:has([data-testid="stVerticalBlockBorderWrapper"])) { }
+.stVerticalBlock.st-key-x { }
+div[data-testid="stLayoutWrapper"] > div[data-testid="stVerticalBlock"][class*="border"] { }
+.cabeza { margin: 0 0 var(--esp-2); }
+.cabeza h2 { font-size: 1.02rem !important; font-weight: 600 !important; color: var(--morado) !important; margin: 0 !important; padding: 0 !important; line-height: 1.3 !important; }
+.cabeza p { font-size: .76rem !important; font-weight: 500 !important; color: var(--naranja-texto) !important; margin: .1rem 0 0 !important; }
+.cabeza.oscura h2 { color: #fff !important; } .cabeza.oscura p { color: var(--cian-claro) !important; }
+
+/* ── KPI ── */
+.kpi { background:#fff; border-radius: var(--radio-tarjeta); padding: var(--relleno-tarjeta); height: 100%; display:flex; flex-direction:column; gap: var(--esp-1); }
+.kpi .et { font-size: .7rem; color: var(--gris); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+.kpi .va { font-size: clamp(1.45rem, 2.1vw, 2rem); font-weight: 700; color: var(--tinta); line-height: 1.05; letter-spacing: -.02em; white-space: nowrap; }
+.kpi .et, .meta .et-meta { word-break: normal; overflow-wrap: normal; hyphens: manual; }
+.kpi .no { font-size: .74rem; color: var(--gris); line-height: 1.35; }
+.kpi.oscuro { background: var(--morado); }
+.kpi.oscuro .et { color: var(--lavanda-2); } .kpi.oscuro .va { color: #fff; } .kpi.oscuro .no { color: var(--lavanda-2); }
+
+/* ── Chips ── */
+.chip { display:inline-block; border-radius: var(--radio-pildora); padding:.18rem .6rem; font-size:.7rem; font-weight:600; letter-spacing:.02em;
+  width: fit-content; max-width: 100%; white-space: normal; line-height: 1.35; overflow-wrap: anywhere; }
+.tabla .chip { white-space: nowrap; }
+.chip.ok, .chip.verde { background:var(--ok-suave); color:var(--ok); }
+.chip.alerta, .chip.amarillo { background:var(--alerta-suave); color:var(--alerta); }
+.chip.riesgo, .chip.rojo { background:var(--riesgo-suave); color:var(--riesgo); }
+.chip.morado { background:var(--lavanda); color:var(--morado); }
+.chip.neutro, .chip.gris { background:#F1EFF5; color:var(--gris); }
+.chip.ia { background:#E3F6FA; color:#075E70; }
+.chip.ia::before { content:'✦ '; }
+.kpi.oscuro .chip.ia { background: rgba(138,230,247,.18); color:var(--cian-claro); }
+.nota-ia { font-size:.74rem; color:var(--gris); margin:.15rem 0 .4rem; }
+.nota-ia b { color:#075E70; }
+.kpi.oscuro .chip.morado { background: rgba(255,255,255,.16); color:#fff; }
+
+/* ── Distribución: sin superposiciones ni alturas distintas ── */
+/* Streamlit compensa el margen del último párrafo con margin-bottom:-16px; los componentes propios no lo tienen,
+   así que se anula para que el bloque siguiente no se monte encima. */
+[data-testid="stMarkdownContainer"]:has(.fila-tarjetas, .titulo, .subtitulo, .pildoras, .cabeza, .tabla, .heroe, .act,
+  .hallazgo, .panel-titulo, .usuario, .lema-lateral, .login-hero, .login-titulo, .login-fila, .filtros-ayuda) { margin-bottom: 0 !important; }
+/* Tarjetas que comparten fila: todas con la altura de la más alta. */
+[data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stLayoutWrapper"]:only-child > div[class*="st-key-tarjeta"]) {
+  align-items: stretch !important; }
+[data-testid="stColumn"] > [data-testid="stVerticalBlock"]:has(> [data-testid="stLayoutWrapper"]:only-child > div[class*="st-key-tarjeta"]),
+[data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stLayoutWrapper"]:only-child:has(> div[class*="st-key-tarjeta"]),
+[data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stLayoutWrapper"]:only-child > div[class*="st-key-tarjeta"] {
+  height: 100% !important; }
+
+/* ── Filas de tarjetas del mismo tipo (altura uniforme) ── */
+/* Fila de KPIs o metas (comun.fila): como máximo --n tarjetas por línea y cada una de al menos 10,5 rem.
+   Si no caben, las que sobran bajan a la línea siguiente con el mismo ancho. */
+.fila-tarjetas { display:grid; gap: var(--separacion); align-items: stretch;
+  grid-template-columns: repeat(auto-fit, minmax(max(10.5rem, calc((100% - (var(--n) - 1) * var(--separacion)) / var(--n))), 1fr)); }
+@media (max-width: 1320px) { .kpi { padding: var(--esp-3); } .kpi .et { font-size: .66rem; letter-spacing: .03em; } }
+.fila-tarjetas > div { height: 100%; min-width: 0; }
+.et-meta { font-size: .7rem; color: var(--gris); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+
+/* ── Metas 2027 ── */
+.meta { background:#fff; border-radius: var(--radio-tarjeta); padding: var(--relleno-tarjeta); height:100%; }
+.meta .fila { display:flex; align-items:baseline; gap:.5rem; flex-wrap: wrap; margin-top:.3rem; }
+.meta .va { font-size: clamp(1.5rem, 2vw, 1.9rem); font-weight:700; color:var(--tinta); letter-spacing:-.02em; }
+.meta .obj { font-size:.78rem; color:var(--gris); }
+.meta .barra { position:relative; height:10px; background:var(--menta); border-radius: var(--radio-pildora); margin: var(--esp-2) 0; }
+.meta .barra .relleno { width: var(--avance, 0%); height:100%; border-radius: var(--radio-pildora); background:var(--naranja); }
+.meta .barra .marca-ia { position:absolute; left: calc(var(--pos, 0%) - 2px); top:-4px; bottom:-4px; width:4px; border-radius:2px; background: var(--cian-graf); }
+.meta .no.ia { color:#075E70; }
+.meta .no { font-size:.74rem; color:var(--gris); }
+
+/* ── Panel derecho morado ── */
+div[class*="st-key-panel"] { background: var(--morado); border-radius: var(--radio-tarjeta); padding: var(--esp-5) var(--esp-4) var(--esp-4); position: relative; overflow: hidden; }
+div[class*="st-key-panel"] div[class*="st-key-tarjeta"] { border-radius: var(--radio-interno) !important; padding: var(--esp-3) var(--esp-4) !important; }
+div[class*="st-key-panel"] .stMarkdown p, div[class*="st-key-panel"] label { color: #fff; }
+div[class*="st-key-panel"] div[class*="st-key-tarjeta"] .stMarkdown p { color: var(--tinta); }
+.panel-titulo { color:#fff !important; font-size:1.08rem !important; font-weight:600 !important; margin:0 !important; padding:0 !important; line-height:1.3 !important; }
+.panel-lema { color:var(--cian-claro) !important; font-size:.76rem !important; font-weight:500 !important; margin:.1rem 0 .3rem !important; }
+.act { background:#fff; border-radius: var(--radio-interno); padding: var(--esp-3) var(--esp-4); margin-bottom: var(--esp-2); }
+.act b { display:block; color:var(--tinta); font-size:.84rem; font-weight:600; line-height:1.3; }
+.act span { display:block; color:var(--gris); font-size:.75rem; line-height:1.35; margin-top:.15rem; }
+.act.acento { border-left: 4px solid var(--naranja); }
+.hallazgo { display:flex; gap: var(--esp-2); align-items:stretch; background:var(--lavanda); border-radius: var(--radio-control); padding: var(--esp-3); margin-bottom: var(--esp-2); }
+.hallazgo::before { content:''; width:4px; border-radius:2px; background:var(--morado); flex:none; }
+.hallazgo div { font-size:.82rem; color:var(--tinta); line-height:1.4; }
+
+/* ── Tabla HTML (componentes Tabla/Encabezado y Tabla/Fila) ── */
+.tabla { width:100%; border-collapse:collapse; }
+.tabla th { white-space: nowrap; font-size:.7rem; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--gris);
+  text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--linea); background:transparent; }
+.tabla td { font-size:.82rem; color:var(--tinta); padding:.55rem .6rem; border-bottom:1px solid var(--linea); vertical-align:middle; }
+.tabla td .t { font-weight:600; display:block; } .tabla td .d { color:var(--gris); font-size:.74rem; display:block; }
+.tabla td.nw, .tabla td.nw .t, .tabla td.nw .d { white-space: nowrap; }
+.tabla tr:last-child td { border-bottom:none; } .tabla td.num { text-align:right; font-variant-numeric: tabular-nums; }
+
+/* ── Héroe (tarjeta morada "Pregúntale a Pulso") ── */
+.heroe { background:var(--morado) var(--cinta) no-repeat right 30px top -60px / 150px auto; border-radius: var(--radio-tarjeta); padding: var(--esp-5) var(--esp-6); }
+.heroe .lema { color:var(--cian-claro); font-size:.8rem; font-weight:500; }
+.heroe h2 { color:#fff !important; font-size:1.35rem !important; font-weight:700 !important; margin:.2rem 0 .2rem !important; padding:0 !important; }
+.heroe p { color:var(--lavanda-2) !important; font-size:.85rem !important; max-width: 70%; margin:0 !important; }
+
+/* ── Controles ── */
+.stButton button, .stDownloadButton button { border-radius: var(--radio-pildora) !important; font-weight: 600 !important; padding: .45rem 1.2rem !important; }
+.stButton button[kind="primary"], .stDownloadButton button[kind="primary"], button[data-testid="stBaseButton-primary"] {
+  background: var(--naranja-accion) !important; border-color: var(--naranja-accion) !important; color: #fff !important; }
+.stButton button[kind="primary"]:hover, .stDownloadButton button[kind="primary"]:hover { background: var(--riesgo) !important; border-color: var(--riesgo) !important; }
+button[data-testid="stBaseButton-secondary"] { background: #fff; color: var(--morado); border-color: var(--lavanda-2); }
+[data-baseweb="select"] > div, [data-baseweb="input"], .stTextInput input, .stDateInput input { border-radius: var(--radio-control) !important; }
+[data-testid="stMain"] [data-baseweb="select"] > div, [data-testid="stMain"] [data-baseweb="input"] { background:#fff; border-color:var(--linea); }
+[data-testid="stWidgetLabel"] p { font-size: .74rem !important; font-weight: 600 !important; color: var(--gris) !important; text-transform: uppercase; letter-spacing: .05em; }
+div[class*="st-key-panel"] [data-testid="stWidgetLabel"] p { color: var(--lavanda-2) !important; }
+.stTabs [data-baseweb="tab-list"] { gap: .4rem; border-bottom: none; }
+.stTabs [data-baseweb="tab"] { background:#fff; border-radius: var(--radio-pildora); padding:.4rem 1rem; height:auto; }
+.stTabs [data-baseweb="tab"] p { font-weight:600; font-size:.85rem; color:var(--morado); }
+.stTabs [aria-selected="true"] { background:var(--morado); } .stTabs [aria-selected="true"] p { color:#fff !important; }
+.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] { display:none; }
+/* Pestañas (Streamlit ≥ 1.6x: data-testid="stTab") como píldoras */
+[data-testid="stTabs"] [role="tablist"] { gap: .45rem; border: none !important; box-shadow: none !important; flex-wrap: wrap; }
+[data-testid="stTabs"] [role="tablist"]::after, [data-testid="stTabs"] [role="tablist"]::before { display: none !important; }
+[data-testid="stTab"] { background:#fff; border-radius: var(--radio-pildora); padding:.5rem 1.15rem !important; height:auto !important;
+  border: 1px solid var(--linea); cursor: pointer; }
+[data-testid="stTab"] p { font-weight:600 !important; font-size:.88rem !important; color:var(--morado) !important; margin:0 !important; }
+[data-testid="stTab"]:hover { border-color: var(--lavanda-graf); }
+[data-testid="stTab"][aria-selected="true"] { background:var(--morado); border-color:var(--morado); }
+[data-testid="stTab"][aria-selected="true"] p { color:#fff !important; }
+[data-testid="stTab"] > div:not([data-testid]) { display:none !important; }
+[data-testid="stSegmentedControl"] button, [data-testid="stButtonGroup"] button { border-radius: var(--radio-pildora) !important; background:#fff; }
+[data-testid="stButtonGroup"] button[aria-checked="true"], [data-testid="stButtonGroup"] button[kind*="Active"] {
+  background:var(--morado) !important; color:#fff !important; border-color:var(--morado) !important; }
+[data-testid="stDataFrame"] { border-radius: var(--radio-control); overflow: hidden; }
+[data-testid="stMain"] [data-testid="stExpander"] details { background:#fff; border:none; border-radius: var(--radio-tarjeta); }
+[data-testid="stMain"] [data-testid="stExpander"] summary p { color:var(--morado); font-weight:600; }
+[data-testid="stAlert"] { border-radius: var(--radio-interno); }
+[data-testid="stAlert"]:has([data-testid="stAlertContentInfo"]) > div { background: var(--lavanda) !important; color: var(--tinta) !important; }
+[data-testid="stAlertContentInfo"] p, [data-testid="stAlertContentInfo"] svg { color: var(--morado-900) !important; fill: var(--morado) !important; font-size: .9rem; }
+[data-testid="stCaptionContainer"] { color: var(--gris); }
+
+/* ── Chips del nivel de riesgo: punto del mismo color del gráfico + texto (no depende solo del color) ── */
+.chip.sem { background:#F1EFF5; color:var(--tinta); display:inline-flex; align-items:center; gap:.35rem; }
+.chip.sem::before { content:''; width:8px; height:8px; border-radius:50%; background: var(--c, var(--gris)); flex:none; }
+.chip.sem-rojo { --c: var(--naranja); } .chip.sem-amarillo { --c: var(--lavanda-graf); } .chip.sem-verde { --c: var(--morado); }
+.chip.sem.alto { background:var(--naranja-suave); color:var(--riesgo); }
+.kpi.oscuro .chip.sem { background: rgba(255,255,255,.16); color:#fff; }
+
+/* ── Barra de filtros sobre el panel ── */
+div[class*="st-key-barra_filtros"] { background:#FFFFFF; border-radius: var(--radio-tarjeta); padding: var(--esp-3) var(--esp-4) var(--esp-2) !important; gap: var(--esp-2) !important; }
+div[class*="st-key-barra_filtros"] [data-testid="stHorizontalBlock"] { gap: var(--esp-3) !important; align-items: flex-end; }
+div[class*="st-key-barra_filtros"] [data-baseweb="select"] > div, div[class*="st-key-barra_filtros"] [data-baseweb="input"] {
+  background: var(--menta) !important; border-color: transparent !important; min-height: 40px; }
+div[class*="st-key-barra_filtros"] [data-baseweb="tag"] { background: var(--lavanda) !important; }
+div[class*="st-key-barra_filtros"] [data-baseweb="tag"] span { color: var(--morado) !important; font-weight: 600; }
+div[class*="st-key-barra_filtros"] .stButton button { min-height: 40px; white-space: nowrap; }
+.filtros-ayuda { font-size: .76rem; color: var(--gris); margin: 0; display:flex; align-items:center; gap:.4rem; }
+.filtros-ayuda b { color: var(--morado); font-weight: 600; }
+div[class*="st-key-xf_activos"] [data-testid="stHorizontalBlock"] { flex-wrap: wrap; gap: .4rem !important; align-items: center; }
+div[class*="st-key-xf_activos"] [data-testid="stColumn"] { width: auto !important; flex: 0 0 auto !important; min-width: 0 !important; }
+div[class*="st-key-xf_quitar"] button { background: var(--morado) !important; color:#fff !important; border-color: var(--morado) !important;
+  padding: .2rem .8rem !important; min-height: 0 !important; font-size: .76rem !important; }
+div[class*="st-key-xf_quitar"] button p { font-size: .76rem !important; }
+div[class*="st-key-limpiar_filtros"] button { padding: .2rem .8rem !important; min-height: 0 !important; }
+div[class*="st-key-limpiar_filtros"] button p { font-size: .76rem !important; }
+
+/* ── Gráficos interactivos: cursor de clic, como en Power BI ── */
+div[class*="st-key-gi_"] .nsewdrag, div[class*="st-key-gi_"] .pielayer path, div[class*="st-key-gi_"] .hm { cursor: pointer !important; }
+
+/* ── Ícono de ayuda con la definición del indicador (hover o foco con teclado) ── */
+.kpi, .meta { position: relative; }
+.ayuda { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; margin-left:.35rem;
+  border-radius:50%; background:var(--lavanda); color:var(--morado); font-size:.62rem; font-weight:700; cursor:help;
+  vertical-align: middle; position: relative; text-transform:none; letter-spacing:0; }
+.kpi.oscuro .ayuda { background: rgba(255,255,255,.2); color:#fff; }
+.ayuda:hover::after, .ayuda:focus::after { content: attr(data-tip); position:absolute; left:50%; top:22px; transform:translateX(-50%);
+  width: 260px; background:var(--morado-900); color:#fff; font-size:.74rem; font-weight:400; line-height:1.4;
+  padding:.6rem .7rem; border-radius:10px; z-index:1000; text-align:left; white-space:normal; box-shadow:0 8px 24px rgba(43,10,107,.25); }
+div[class*="st-key-acciones_encabezado"] { display:flex; justify-content:flex-end; margin-top:.35rem; }
+div[class*="st-key-acciones_encabezado"] [data-testid="stHorizontalBlock"] { justify-content:flex-end; }
+
+/* ── Accesibilidad: foco visible al navegar con teclado (WCAG 2.4.7) ── */
+a:focus-visible, button:focus-visible, [role="tab"]:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+  outline: 3px solid var(--naranja) !important; outline-offset: 2px !important; }
+[data-testid="stSidebar"] a:focus-visible, [data-testid="stSidebar"] button:focus-visible { outline-color: var(--cian-claro) !important; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ══ Distribución adaptable (comun.columnas) ══════════════════════════════════════
+   Cada fila creada con comun.columnas() va dentro de un contenedor st-key-col_<tipo>_<n>.
+   Se usan consultas de contenedor (@container): responden al ancho real que tiene la fila,
+   que cambia si la barra lateral está abierta o cerrada, y no solo al ancho de la pantalla. */
+div[class*="st-key-col_"] { container-type: inline-size; width: 100%; }
+div[class*="st-key-col_"] > [data-testid="stHorizontalBlock"],
+div[class*="st-key-col_"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] { flex-wrap: wrap; }
+
+/* Principal + panel: con menos de 900 px el panel baja debajo del contenido principal. */
+@container (max-width: 900px) {
+  div[class*="st-key-col_lateral"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+  div[class*="st-key-col_lateral"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+    flex: 1 1 100% !important; width: 100% !important; min-width: 100% !important; }
+}
+
+/* Gráficas o tarjetas lado a lado: con menos de 620 px, una debajo de la otra. */
+@container (max-width: 620px) {
+  div[class*="st-key-col_pareja"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+  div[class*="st-key-col_pareja"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+    flex: 1 1 100% !important; width: 100% !important; min-width: 100% !important; }
+}
+
+/* Con la barra lateral cerrada, Streamlit pone el logo en el header (encima del contenido):
+   el contenido baja para que el logo no quede sobre el título de la página. */
+.stApp:has([data-testid="stSidebar"][data-collapsed="true"]) .block-container { padding-top: 4rem !important; }
+
+/* Controles (filtros): cada uno mide al menos 9,5 rem y el primero (Periodo) 14,5 rem.
+   Los que no caben bajan a la línea siguiente. Las etiquetas no se parten a mitad de palabra. */
+div[class*="st-key-col_controles"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+div[class*="st-key-col_controles"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+  flex: 1 1 9.5rem !important; min-width: 9.5rem !important; width: auto !important; }
+div[class*="st-key-col_controles"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child,
+div[class*="st-key-col_controles"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child {
+  flex: 2 1 14.5rem !important; min-width: 14.5rem !important; }
+div[class*="st-key-col_controles"] label p { overflow-wrap: normal !important; word-break: normal !important; hyphens: none; }
+
+/* Texto + acción: el texto ocupa el espacio libre y el botón conserva su ancho natural (no se corta). */
+div[class*="st-key-col_texto_accion"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child,
+div[class*="st-key-col_texto_accion"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child {
+  flex: 1 1 14rem !important; min-width: 0 !important; width: auto !important; }
+div[class*="st-key-col_texto_accion"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child,
+div[class*="st-key-col_texto_accion"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child {
+  flex: 0 0 auto !important; min-width: 0 !important; width: auto !important; }
+
+/* Separación entre columnas: la misma que entre bloques (Streamlit usa 1 rem o 2 rem según el parámetro gap). */
+div[class*="st-key-col_lateral"] > [data-testid="stHorizontalBlock"],
+div[class*="st-key-col_lateral"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"],
+div[class*="st-key-col_pareja"] > [data-testid="stHorizontalBlock"],
+div[class*="st-key-col_pareja"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] { gap: var(--separacion) !important; }
+
+/* Títulos propios (h1 de la página, h2 de tarjetas y paneles): sin el ícono de enlace que Streamlit agrega a los encabezados. */
+.titulo [data-testid="stHeaderActionElements"], .cabeza [data-testid="stHeaderActionElements"],
+.panel-titulo [data-testid="stHeaderActionElements"], .heroe [data-testid="stHeaderActionElements"],
+.empresa-id [data-testid="stHeaderActionElements"], .lista-titulo [data-testid="stHeaderActionElements"] { display: none !important; }
+.tabla th.num { text-align: right; }
+
+/* ── Ficha 360° ── */
+.ficha-empresa { padding: var(--esp-5) var(--esp-6); }
+.ficha-empresa .linea { display:flex; flex-wrap:wrap; align-items:center; gap: var(--esp-2); }
+.ficha-empresa .empresa-id { font-size: 1.5rem !important; font-weight: 700 !important; color: var(--morado) !important;
+  margin: 0 var(--esp-2) 0 0 !important; padding: 0 !important; line-height: 1.2 !important; }
+.ficha-empresa .subtitulo { margin: var(--esp-2) 0 0 !important; }
+.probabilidad { display:flex; flex-wrap:wrap; align-items:baseline; gap: var(--esp-2); margin: 0 0 var(--esp-1) !important; }
+.probabilidad .valor { font-size: 2rem; font-weight: 700; color: var(--color, var(--morado)); line-height: 1.1; }
+.lista-titulo { font-size: .8rem !important; font-weight: 700 !important; color: var(--tinta) !important;
+  margin: var(--esp-2) 0 var(--esp-1) !important; padding: 0 !important; line-height: 1.3 !important; }
+.lista-titulo .detalle { font-weight: 400; }
+.lista-ia { margin: 0 !important; padding-left: var(--esp-5); font-size: .8rem; }
+.lista-ia li { margin: 0 !important; font-size: .8rem; }
