@@ -112,8 +112,14 @@ def huellas_fuentes() -> dict:
     if faltan:
         raise FileNotFoundError("Faltan archivos en Datos/:\n  - " + "\n  - ".join(faltan))
     todas = dict(FUENTES, **{f: r for f, r in FUENTES_OPCIONALES.items() if (DATOS / r).exists()})
-    return {f: {"archivo": r, "hash": sha256(DATOS / r), "bytes": (DATOS / r).stat().st_size}
-            for f, r in todas.items()}
+    huellas = {f: {"archivo": r, "hash": sha256(DATOS / r), "bytes": (DATOS / r).stat().st_size}
+               for f, r in todas.items()}
+    # Archivos importados desde el tablero (Datos/9. Importaciones/<tipo>/): una huella por carpeta, así se detecta
+    # tanto un archivo nuevo como uno retirado.
+    from importaciones import TIPOS_AGREGAR, huella_carpeta
+    for tipo in TIPOS_AGREGAR:
+        huellas[f"imp_{tipo}"] = huella_carpeta(DATOS, tipo)
+    return huellas
 
 
 def ultimas_huellas(conn) -> dict:
@@ -144,6 +150,15 @@ def cerrar_ejecucion(conn, ejecucion_id=None, estado="procesado", detalle=None, 
         conn.execute(sql + "WHERE id = %s", params + [ejecucion_id])
     else:
         conn.execute(sql + "WHERE dag_run_id = %s AND estado = 'en_curso'", params + [dag_run_id])
+    # Importaciones hechas desde el tablero que entraron en esta carga
+    if estado == "procesado":
+        # Todo lo que está en Datos/9. Importaciones entra en cada carga: también lo que falló en un intento anterior.
+        conn.execute("""UPDATE ingesta.importacion SET estado = 'procesado', mensaje = NULL,
+                               ejecucion_id = coalesce(%s, (SELECT max(id) FROM ingesta.ejecucion))
+                        WHERE estado IN ('recibido', 'con_errores')""", [ejecucion_id])
+    elif estado == "con_errores":
+        conn.execute("""UPDATE ingesta.importacion SET estado = 'con_errores', mensaje = %s
+                        WHERE estado = 'recibido'""", [json.dumps(detalle or {}, default=str)[:500]])
 
 
 def registrar_lotes(conn, ejecucion_id, huellas):

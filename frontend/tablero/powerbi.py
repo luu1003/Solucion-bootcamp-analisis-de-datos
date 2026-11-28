@@ -31,6 +31,13 @@ ESQ = "https://developer.microsoft.com/json-schemas/fabric/item/report/definitio
 V_REPORT, V_PAGE, V_VISUAL = "3.1.0", "2.0.0", "2.5.0"
 
 MORADO, NARANJA, LAVANDA, CIAN, TINTA, MENTA = "#5B00D9", "#FF5A0F", "#9D75FF", "#0B8199", "#1B1235", "#EEF6F5"
+# Tipografía de marca (Poppins). Si el equipo no la tiene instalada, Power BI usa Segoe UI.
+FUENTE = "Poppins, 'Segoe UI', wf_segoe-ui_normal, helvetica, arial, sans-serif"
+FUENTE_FUERTE = "'Poppins SemiBold', Poppins, 'Segoe UI Semibold', wf_segoe-ui_semibold, helvetica, arial, sans-serif"
+RECURSOS = Path(__file__).resolve().parent / "recursos"
+ESTATICOS = Path(__file__).resolve().parent / "static"
+LOGO = "logo_actho.png"
+ALTO_FRANJA = 72
 
 TEMA = {
     "name": "ACTHO",
@@ -39,10 +46,10 @@ TEMA = {
     "good": MORADO, "neutral": LAVANDA, "bad": NARANJA,
     "maximum": MORADO, "center": LAVANDA, "minimum": "#EFE6FF",
     "textClasses": {
-        "title": {"fontFace": "Segoe UI Semibold", "fontSize": 13, "color": MORADO},
-        "header": {"fontFace": "Segoe UI Semibold", "fontSize": 12, "color": TINTA},
-        "label": {"fontFace": "Segoe UI", "fontSize": 10, "color": "#5E5876"},
-        "callout": {"fontFace": "Segoe UI Bold", "fontSize": 28, "color": TINTA},
+        "title": {"fontFace": FUENTE_FUERTE, "fontSize": 13, "color": MORADO},
+        "header": {"fontFace": FUENTE_FUERTE, "fontSize": 12, "color": TINTA},
+        "label": {"fontFace": FUENTE, "fontSize": 10, "color": "#5E5876"},
+        "callout": {"fontFace": FUENTE_FUERTE, "fontSize": 28, "color": TINTA},
     },
     "visualStyles": {
         "*": {"*": {
@@ -263,15 +270,37 @@ def _visual(nombre, x, y, w, h, z, tipo, consulta=None, titulo=None, objetos=Non
     return d
 
 
-def _texto(nombre, x, y, w, h, z, titulo, sub):
+def _fondo(color) -> dict:
+    return {"background": [{"properties": {"show": _lit("true"), "color": {"solid": {"color": _lit(f"'{color}'")}},
+                                           "transparency": _lit("0D")}}]}
+
+
+def _texto(nombre, x, y, w, h, z, titulo, sub, claro=False):
+    """Título y subtítulo. claro=True: texto blanco sobre la franja morada del encabezado."""
     corrida = lambda t, tam, color, peso=None: {"value": t, "textStyle": dict(
-        {"fontFamily": "Segoe UI", "fontSize": tam, "color": color}, **({"fontWeight": peso} if peso else {}))}
+        {"fontFamily": FUENTE_FUERTE if peso else FUENTE, "fontSize": tam, "color": color},
+        **({"fontWeight": peso} if peso else {}))}
+    v = {"visualType": "textbox", "drillFilterOtherVisuals": True,
+         "objects": {"general": [{"properties": {"paragraphs": [
+             {"textRuns": [corrida(titulo, "20pt", "#FFFFFF" if claro else TINTA, "bold")]},
+             {"textRuns": [corrida(sub, "11pt", "#C9B2FF" if claro else "#5E5876")]}]}}]}}
+    if claro:
+        v["visualContainerObjects"] = _fondo(MORADO)
     return {"$schema": f"{ESQ}/visualContainer/{V_VISUAL}/schema.json", "name": nombre,
-            "position": {"x": x, "y": y, "z": z, "height": h, "width": w, "tabOrder": z},
-            "visual": {"visualType": "textbox", "drillFilterOtherVisuals": True,
-                       "objects": {"general": [{"properties": {"paragraphs": [
-                           {"textRuns": [corrida(titulo, "22pt", TINTA, "bold")]},
-                           {"textRuns": [corrida(sub, "11pt", "#5E5876")]}]}}]}}}
+            "position": {"x": x, "y": y, "z": z, "height": h, "width": w, "tabOrder": z}, "visual": v}
+
+
+def _encabezado(prefijo, titulo, sub, ancho=1280) -> list:
+    """Franja morada a todo el ancho con el logo de ACTHO a la izquierda y el título en blanco."""
+    logo = {"$schema": f"{ESQ}/visualContainer/{V_VISUAL}/schema.json", "name": f"{prefijo}logo",
+            "position": {"x": 0, "y": 0, "z": 1, "height": ALTO_FRANJA, "width": 190, "tabOrder": 1},
+            "visual": {"visualType": "image", "drillFilterOtherVisuals": True,
+                       "objects": {"general": [{"properties": {"imageUrl": {"expr": {"ResourcePackageItem": {
+                           "PackageName": "RegisteredResources", "PackageType": 1, "ItemName": LOGO}}}}}],
+                           "imageScaling": [{"properties": {"imageScalingType": _lit("'Fit'")}}]},
+                       "visualContainerObjects": {**_fondo(MORADO), "padding": [{"properties": {
+                           "top": _lit("14D"), "bottom": _lit("14D"), "left": _lit("22D"), "right": _lit("8D")}}]}}}
+    return [logo, _texto(f"{prefijo}titulo", 190, 0, ancho - 190, ALTO_FRANJA, 2, titulo, sub, claro=True)]
 
 
 def _segmentaciones(prefijo, y):
@@ -290,8 +319,8 @@ RIESGO_COLOR = {"Alto": NARANJA, "Medio": LAVANDA, "Bajo": MORADO}
 
 def pagina_dashboard() -> tuple[dict, list]:
     pid = "dashboard0000000001"
-    vis = [_texto("titulo", 16, 8, 900, 64, 1, "Dashboard · ACTHO",
-                  "Cómo va la asociación: afiliados, renovación, uso de beneficios, satisfacción y riesgo")]
+    vis = _encabezado("d", "Dashboard",
+                      "Cómo va la asociación: afiliados, renovación, uso de beneficios, satisfacción y riesgo")
     vis += _segmentaciones("d", 80)
     tarjetas = ["Afiliados activos", "Vencen en 90 días", "Uso de beneficios", "Tasa de renovación", "NPS de eventos", "Riesgo alto"]
     for i, m in enumerate(tarjetas):
@@ -332,8 +361,8 @@ def pagina_dashboard() -> tuple[dict, list]:
 
 def pagina_renovaciones() -> tuple[dict, list]:
     pid = "renovaciones000000002"
-    vis = [_texto("titulo2", 16, 8, 900, 64, 1, "Renovaciones prioritarias",
-                  "Vigentes que vencen en 90 días o ya vencidas, ordenadas por puntaje de riesgo")]
+    vis = _encabezado("r", "Renovaciones prioritarias",
+                      "Vigentes que vencen en 90 días o ya vencidas, ordenadas por puntaje de riesgo")
     vis += _segmentaciones("r", 80)
     cols = ["Empresa", "Ejecutiva", "Nivel 2027", "Fecha de expiración", "Días a vencer", "Riesgo", "Puntaje de riesgo",
             "Asistencias 12 meses", "Motivos de riesgo"]
@@ -358,7 +387,8 @@ def archivos_informe(tema_base: dict | None = None) -> dict:
               "themeCollection": {"customTheme": {"name": "ACTHO.json", "reportVersionAtImport": version_tema,
                                                   "type": "RegisteredResources"}},
               "resourcePackages": [{"name": "RegisteredResources", "type": "RegisteredResources",
-                                    "items": [{"name": "ACTHO.json", "path": "ACTHO.json", "type": "CustomTheme"}]}],
+                                    "items": [{"name": "ACTHO.json", "path": "ACTHO.json", "type": "CustomTheme"},
+                                              {"name": LOGO, "path": LOGO, "type": "Image"}]}],
               "settings": {"useStylableVisualContainerHeader": True, "defaultDrillFilterOtherVisuals": True}}
     if tema_base:
         report["themeCollection"]["baseTheme"] = {"name": tema_base["name"], "reportVersionAtImport": version_tema,
@@ -377,6 +407,7 @@ def archivos_informe(tema_base: dict | None = None) -> dict:
             "$schema": f"{ESQ}/versionMetadata/1.0.0/schema.json", "version": "2.0.0"}, indent=2),
         f"{rp}/definition/report.json": json.dumps(report, indent=2, ensure_ascii=False),
         f"{rp}/StaticResources/RegisteredResources/ACTHO.json": json.dumps(TEMA, indent=2, ensure_ascii=False),
+        f"{rp}/StaticResources/RegisteredResources/{LOGO}": (RECURSOS / "logo_powerbi.png").read_bytes(),
     }
     if tema_base:
         f[f"{rp}/StaticResources/SharedResources/BaseThemes/{tema_base['name']}.json"] = json.dumps(tema_base["contenido"])
@@ -398,17 +429,21 @@ LEEME = """ACTHO · Dashboard en Power BI
 Contenido
   ACTHO_Dashboard.pbip            Ábrelo con Power BI Desktop (Windows, versión de 2026 o posterior).
   ACTHO_Dashboard.SemanticModel   Modelo: tablas Empresas, Asistencia, Encuestas y Beneficios, y las medidas.
-  ACTHO_Dashboard.Report          Informe con dos páginas: Dashboard y Renovaciones. Tema con los colores de ACTHO.
+  ACTHO_Dashboard.Report          Informe con dos páginas: Dashboard y Renovaciones, con la franja y el logo
+                                  de ACTHO, sus colores y su tipografía.
   datos/                          Los datos del tablero en CSV (corte {corte}{filtro}).
-  tema_actho.json                 El tema de colores, por si quieres aplicarlo a otro informe.
+  tema_actho.json                 El tema de marca (colores y tipografía), por si quieres aplicarlo a otro informe.
+  fuentes/                        La tipografía de marca, Poppins (licencia libre OFL).
 
 Cómo abrirlo
   1. Descomprime el ZIP directamente en C:\\ para que quede la carpeta C:\\ACTHO_PowerBI\\
      (el modelo busca los datos en C:\\ACTHO_PowerBI\\datos\\).
      Si lo descomprimes en otra carpeta: Inicio > Transformar datos > Editar parámetros >
      CarpetaDatos, y escribe la ruta de la carpeta datos terminada en \\.
-  2. Abre ACTHO_Dashboard.pbip con Power BI Desktop y pulsa "Actualizar" para cargar los datos.
-  3. Los gráficos se filtran entre sí al hacer clic, como en el tablero; las segmentaciones de arriba
+  2. Opcional, para ver la tipografía de marca: abre la carpeta fuentes, selecciona los archivos .ttf,
+     clic derecho > Instalar. Sin Poppins, el informe usa Segoe UI.
+  3. Abre ACTHO_Dashboard.pbip con Power BI Desktop y pulsa "Actualizar" para cargar los datos.
+  4. Los gráficos se filtran entre sí al hacer clic, como en el tablero; las segmentaciones de arriba
      filtran por nivel, tipo de afiliado, sector, ciudad y ejecutiva.
 
 Notas
@@ -435,6 +470,9 @@ def construir_zip(datos: dict, corte, nota_filtro="", carpeta_datos=CARPETA_DEFE
         for tabla, df in datos.items():
             z.writestr(f"{raiz}/datos/{ARCHIVO[tabla]}", df.to_csv(index=False, encoding="utf-8"))
         z.writestr(f"{raiz}/tema_actho.json", json.dumps(TEMA, indent=2, ensure_ascii=False))
+        for fuente in sorted(ESTATICOS.glob("Poppins-*.ttf")) + [ESTATICOS / "OFL.txt"]:
+            if fuente.exists():
+                z.write(fuente, f"{raiz}/fuentes/{fuente.name}")
         z.writestr(f"{raiz}/LEEME.txt", LEEME.format(corte=pd.Timestamp(corte).strftime("%d/%m/%Y"), filtro=nota_filtro))
     return buf.getvalue()
 

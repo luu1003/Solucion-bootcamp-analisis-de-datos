@@ -39,7 +39,24 @@ CREATE TABLE IF NOT EXISTS ingesta.lote_carga (
 ALTER TABLE ingesta.lote_carga DROP CONSTRAINT IF EXISTS lote_carga_fuente_check;
 ALTER TABLE ingesta.lote_carga ADD CONSTRAINT lote_carga_fuente_check
     CHECK (fuente IN ('zoho_crm', 'asistencia_excel', 'encuesta_presencial', 'encuesta_virtual',
-                      'encuesta_post_evento', 'base_afiliados', 'encuesta_90d', 'uso_beneficios'));
+                      'encuesta_post_evento', 'base_afiliados', 'encuesta_90d', 'uso_beneficios',
+                      'imp_asistencia', 'imp_enc_post', 'imp_enc_90d', 'imp_uso_beneficios'));
+
+-- Archivos subidos desde el tablero (Importar datos). Estado: recibido → procesado (o con_errores).
+CREATE TABLE IF NOT EXISTS ingesta.importacion (
+    importacion_id serial PRIMARY KEY,
+    creado timestamp DEFAULT now(),
+    usuario text,
+    tipo text NOT NULL,
+    modo text,
+    archivo_original text,
+    archivo_guardado text,
+    filas integer,
+    estado text DEFAULT 'recibido',
+    procesado_por text,
+    ejecucion_id integer,
+    mensaje text
+);
 
 -- Semáforo por empresa en cada fecha de corte (permite ver cómo evoluciona el riesgo).
 CREATE TABLE IF NOT EXISTS historial.evaluacion_riesgo (

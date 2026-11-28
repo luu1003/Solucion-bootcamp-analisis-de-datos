@@ -15,7 +15,8 @@ import streamlit as st
 
 AQUI = Path(__file__).resolve().parent
 
-st.set_page_config(page_title="ACTHO · Tablero de afiliados", page_icon="🟣", layout="wide",
+st.set_page_config(page_title="ACTHO · Tablero de afiliados", page_icon=str(AQUI / "recursos" / "icono_actho.png"),
+                   layout="wide",
                    initial_sidebar_state="expanded")
 
 import comun  # noqa: E402
@@ -47,6 +48,7 @@ SECCIONES = {
     ],
     "Datos": [
         ("08_datos_calidad.py", "Datos y calidad", ":material/fact_check:"),
+        ("11_importar_datos.py", "Importar datos", ":material/upload_file:"),
     ],
 }
 comun.PAGINAS_ACTIVAS.clear()

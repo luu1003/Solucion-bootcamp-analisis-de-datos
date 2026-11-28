@@ -1072,8 +1072,8 @@ El tablero está en `frontend/tablero/` y replica el sistema de diseño de los w
 | Elemento | Cómo se ve |
 | --- | --- |
 | Pantalla | Fondo menta `#EEF6F5`, márgenes de 16 px, tipografía Poppins (incluida en `frontend/tablero/static/`, licencia OFL) |
-| Barra lateral | Morado `#5B00D9`, logo *ac**tho***, secciones en cian, ítem activo en píldora blanca, cinta naranja decorativa, lema "Sentimos el pulso." y bloque de usuario |
-| Encabezado de página | Título, subtítulo y tres píldoras de estado en mayúsculas (corte, última carga, datos por revisar) |
+| Barra lateral | Morado `#5B00D9`, logo *ac**tho*** (con el menú escondido queda el ícono *th* en la barra superior, que también es el ícono de la pestaña del navegador), acceso naranja **Importar datos**, secciones en cian, ítem activo en píldora blanca, cinta naranja decorativa, lema "Sentimos el pulso." y bloque de usuario |
+| Encabezado de página | Título, subtítulo, una línea con la fecha de los datos y tres píldoras pequeñas de negocio en una sola fila (afiliadas vigentes, renovación frente a la meta y vencimientos de 60 días), cada una con su explicación al pasar el cursor |
 | Tarjetas | Blancas, radio 20, sin borde; título morado y subtítulo naranja |
 | KPI | Etiqueta en mayúsculas, valor grande, chip de tono (OK, Alerta, Riesgo, Morado) y nota; la primera en variante oscura morada |
 | Panel derecho (Pulso) | Morado, con tarjetas blancas de lectura o actividad y botón naranja tipo píldora |
@@ -1087,7 +1087,7 @@ Los componentes están en `comun.py` (`encabezado`, `kpi`, `meta`, `cabeza`, `ta
 - Usuario inicial: `admin` / `actho` (en `auth.py`, solo para desarrollo).
 - Para crear o cambiar usuarios: `python frontend/tablero/auth.py` pide la contraseña y genera la sal y el hash. Estos se agregan en `.streamlit/secrets.toml` bajo `[usuarios]` (archivo fuera de Git), que tiene prioridad sobre los usuarios de `auth.py`.
 
-**Menú:** las 10 páginas están visibles y agrupadas en `Inicio.py` (`SECCIONES`): Resumen (Dashboard, Pulso), Cartera (Base de afiliados, Afiliados, Ficha 360°, Renovación y retención), Experiencias (Experiencias y NPS, Planeación de eventos, Segmentos) y Datos (Datos y calidad). Lo que sale de un modelo lleva el chip **✦ IA** y una nota con su métrica.
+**Menú:** las 11 páginas están visibles y agrupadas en `Inicio.py` (`SECCIONES`): Resumen (Dashboard, Pulso), Cartera (Base de afiliados, Afiliados, Ficha 360°, Renovación y retención), Experiencias (Experiencias y NPS, Planeación de eventos, Segmentos) y Datos (Datos y calidad, Importar datos). Lo que sale de un modelo lleva el chip **✦ IA**, un ícono ⓘ que al pasar el cursor explica en palabras de negocio qué mira el modelo y qué tan confiable es, y una nota con su confiabilidad.
 
 | Página | Wireframe | Para quién | Contenido |
 | --- | --- | --- | --- |
@@ -1100,7 +1100,8 @@ Los componentes están en `comun.py` (`encabezado`, `kpi`, `meta`, `cabeza`, `ta
 | Pulso | 06 | Dirección | Alertas y nuevos rojos (desde `historial`), factores asociados a la retención y **simulador de criterios** del semáforo; ✦ factores del modelo de renovación y comparación semáforo vs. modelo |
 | Planeación de eventos | — | Experiencias | ✦ Simulador: inscritos esperados con rango, % de afiliados, cargos y satisfacción a partir de los eventos parecidos; revisión de la fecha (fines de semana, choques, ola de renovaciones del mes); demanda frente a oferta del tema; convocatoria con quienes autorizaron datos; planes guardados en `historial.plan_evento` y comparados con lo real |
 | Segmentos | — | Comunicaciones | Los segmentos del reto más «Encuesta de 90 días por enviar», con personas contactables (Ley 1581) y exportación; ✦ listas por perfil, por interés en un tema y de no afiliadas parecidas a las afiliadas |
-| Datos y calidad | 07 | Datos | Cargas de Airflow, diagnóstico de calidad, completitud del CRM, **definiciones de los indicadores** para acordar con ACTHO, **conciliación con Zoho**, **cobertura del uso de beneficios** y plantilla mensual, ✦ **fichas de los modelos de IA**, ✦ cruces por revisar, diccionario y recomendaciones de captura |
+| Datos y calidad | 07 | Datos | Cargas de Airflow, diagnóstico de calidad, completitud del CRM, **definiciones de los indicadores** para acordar con ACTHO, **conciliación con Zoho**, **cobertura del uso de beneficios** y plantilla mensual, ✦ **modelos de IA en palabras simples**, ✦ cruces por revisar, diccionario y recomendaciones de captura |
+| Importar datos | — | Datos y Experiencias | Elegir el tipo de datos, descargar la plantilla de Excel, subirla llena o escribir los datos en pantalla, revisar errores antes de enviar e historial de importaciones (sección 7.12) |
 
 **Filtros globales** (barra blanca sobre el contenido, se mantienen al cambiar de página): periodo, nivel 2027, tipo de afiliado, sector, ciudad y ejecutiva, como pide el reto. No aparecen en Ficha 360° ni en Datos y calidad.
 
@@ -1122,7 +1123,7 @@ docker compose up -d postgres tablero
 
 **Constructor de gráficas (Dashboard).** Cada persona arma sus propias consultas sin programar: elige los datos (empresas vigentes, empresas del CRM, asistencias, encuestas o uso de beneficios), la dimensión, un desglose opcional, la medida y el tipo de gráfico. Respetan los filtros, filtran el tablero con un clic y se pueden guardar y cargar como archivo (`graficas.py`).
 
-**Ver en Power BI (Dashboard).** Descarga `ACTHO_PowerBI.zip` con un Power BI Project (PBIP): modelo semántico en TMDL (tablas Empresas, Asistencia, Encuestas y Beneficios, relaciones por empresa y las medidas del tablero con las mismas definiciones), informe en formato PBIR con las páginas *Dashboard* y *Renovaciones* y el tema de ACTHO, los datos en CSV y un `LEEME.txt`. Se descomprime en `C:\` y se abre `ACTHO_Dashboard.pbip` con Power BI Desktop (solo Windows). Los archivos del informe se validaron contra los esquemas JSON oficiales de Microsoft (`microsoft/json-schemas`); el modelo sigue la estructura de los proyectos que guarda Power BI Desktop. También se puede generar por consola: `python frontend/tablero/powerbi.py --salida powerbi/` (`powerbi.py`).
+**Ver en Power BI (Dashboard).** Descarga `ACTHO_PowerBI.zip` con un Power BI Project (PBIP): modelo semántico en TMDL (tablas Empresas, Asistencia, Encuestas y Beneficios, relaciones por empresa y las medidas del tablero con las mismas definiciones), informe en formato PBIR con las páginas *Dashboard* y *Renovaciones* y la imagen de marca de ACTHO (franja morada con el logo *ac**tho*** registrado como recurso del informe, título en blanco, colores y tipografía Poppins con Segoe UI de respaldo), las fuentes Poppins en `fuentes/`, los datos en CSV y un `LEEME.txt`. Se descomprime en `C:\` y se abre `ACTHO_Dashboard.pbip` con Power BI Desktop (solo Windows). Los archivos del informe se validaron contra los esquemas JSON oficiales de Microsoft (`microsoft/json-schemas`); el modelo sigue la estructura de los proyectos que guarda Power BI Desktop. También se puede generar por consola: `python frontend/tablero/powerbi.py --salida powerbi/` (`powerbi.py`).
 
 **Extracto de valor.** Página HTML autocontenida por afiliado (se imprime o guarda como PDF) con lo que usó en 12 meses, las experiencias de su equipo, los beneficios de su nivel usados y pendientes, su voz en las encuestas y sugerencias. No incluye datos personales (`extracto.py`).
 
@@ -1132,7 +1133,9 @@ docker compose up -d postgres tablero
 
 `src/modelos_ia.py` entrena todos los modelos en unos 15 segundos y escribe sus resultados en el esquema `ia` de PostgreSQL (se reemplaza tabla por tabla, así el tablero nunca la ve a medias). El tablero solo lee esas tablas. Se entrenan al final de `setup.py` y en el DAG `actho_recalculo_riesgo_diario` (tarea `entrenar_modelos`), cuando cambian los datos o la fecha de corte. A mano: `python src/modelos_ia.py` o `python src/ingesta_control.py modelos`.
 
-En lugar de una pestaña de IA aparte, cada resultado aparece donde se toma la decisión y lleva el chip **✦ IA**. Las fichas completas (objetivo, método, datos, métrica, línea base y limitaciones) están en *Datos y calidad → Modelos de IA* (`ia.modelo`).
+En lugar de una pestaña de IA aparte, cada resultado aparece donde se toma la decisión y lleva el chip **✦ IA**.
+
+**Explicados en lenguaje de negocio.** Para que el equipo decida si tiene en cuenta la opinión de un modelo, cada uno se explica sin términos técnicos (`NEGOCIO` y `confianza()` en `frontend/tablero/ia.py`): qué pregunta responde, en qué se fija, cómo llega a su opinión, qué tan confiable es (la métrica traducida, por ejemplo «acierta en 8 de cada 10 casos» en vez de «AUC 0,82»), para qué tenerlo en cuenta y cuándo dudar de él. Esa explicación aparece en el ícono ⓘ junto a cada resultado, en la nota bajo cada gráfico y, completa, en *Datos y calidad → Modelos de IA en palabras simples*, con un bloque plegado de detalle técnico (método, métrica y línea base, de `ia.modelo`). En la Ficha 360° la probabilidad de renovar trae además «Cómo leerlo» según la banda (probable, incierta o en riesgo).
 
 | Modelo | Método | Resultado (corte 23/11/2026) | Dónde se ve |
 | --- | --- | --- | --- |
@@ -1150,7 +1153,21 @@ En lugar de una pestaña de IA aparte, cada resultado aparece donde se toma la d
 
 **Límites honestos.** La asistencia solo existe desde enero de 2026, así que la conducta previa de muchas renovaciones no se observa. Por eso la conducta se estima aparte, con las empresas que sí la tienen. Los datos están anonimizados (sin nombres ni correos), así que los cruces de identidad solo usan `persona_id`. Los temas se leen con TF-IDF, no con un modelo de lenguaje: las palabras semilla se escribieron mirando una muestra, así que el 93 % puede ser optimista. Ningún modelo decide por la ejecutiva: ordenan y explican.
 
-### 7.12 Camino hacia la arquitectura objetivo
+### 7.12 Importación de datos con plantillas
+
+La página **Importar datos** (también en el acceso naranja de la barra lateral) permite que el equipo de ACTHO sume datos nuevos sin tocar la base ni los archivos originales:
+
+1. **Elegir qué subir:** asistencia a un evento, encuesta posterior al evento, encuesta de 90 días, uso de beneficios, CRM de Zoho o base principal.
+2. **Descargar la plantilla:** un Excel con los mismos títulos, encabezados y estilos de los archivos que entregó ACTHO (`src/importaciones.py` los copia de los originales), con listas desplegables para los campos cerrados y una hoja *Instrucciones*. La de asistencia trae la hoja HOMOLOGACION del evento y sus hojas de inscritos, como el archivo original.
+3. **Cargar los datos:** subir la plantilla llena o **escribirlos en pantalla** (asistencia, encuestas y uso de beneficios): una tabla editable con los mismos campos y listas; en asistencia se puede elegir un evento existente o crear uno nuevo. Lo escrito se convierte en la misma plantilla, así ambos caminos pasan por las mismas reglas.
+4. **Revisar antes de enviar:** el archivo se valida con los mismos lectores de `limpieza_datos.py`: columnas, fechas, empresas que no existen, duplicados y valores fuera de lista. Se muestran filas leídas, errores (bloquean el envío), advertencias y una vista previa. El CRM y la base principal *reemplazan* el archivo vigente (se guarda un respaldo en `_respaldos/` y se pide confirmación); los demás *se suman*.
+5. **Procesar:** el archivo queda en `Datos/9. Importaciones/<tipo>/` y se registra en `ingesta.importacion` (usuario, tipo, filas y estado). El tablero dispara el DAG `actho_ingesta_datos` por la API de Airflow (`AIRFLOW_API_URL`, configurada en `docker-compose.yml`). Las carpetas de importación cuentan como fuentes con huella propia (`imp_asistencia`, `imp_enc_post`, `imp_enc_90d`, `imp_uso_beneficios`), así que la ingesta detecta el cambio, limpia y carga en PostgreSQL. Sin Airflow (por ejemplo, con `setup.py`), la misma ingesta corre en segundo plano en el equipo, con registro en `Datos/9. Importaciones/procesamiento.log`.
+
+**Reglas al sumar.** Un evento importado se une a uno existente si coincide la fecha y el nombre es igual, está contenido o se parece en 80 % o más; si no, se crea con un `evento_id` nuevo. No se duplican asistentes (evento, persona) ni respuestas de encuesta (las importadas reemplazan a la original con el mismo ID; las escritas sin ID reciben `MAN-…`). El historial de la página muestra cada importación como *En cola*, *En el tablero* o *Con errores*. Para deshacer una importación basta borrar su archivo de `Datos/9. Importaciones/` y volver a correr la ingesta. Como el resto de `Datos/`, esa carpeta no se sube a GitHub.
+
+También por consola: `python src/importaciones.py plantilla asistencia plantilla.xlsx` y `python src/importaciones.py validar asistencia archivo.xlsx`.
+
+### 7.13 Camino hacia la arquitectura objetivo
 
 | Hoy (esquema `actho`) | Arquitectura objetivo (sección 6) |
 | --- | --- |

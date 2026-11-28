@@ -173,27 +173,43 @@ with izq:
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                help="Llénala cada mes y guárdala en Datos/8. Uso de beneficios/uso_beneficios.xlsx")
 
-    with c.tarjeta("Modelos de IA", "✦ Qué hace cada modelo, con qué datos, qué tan bien funciona y sus límites",
+    with c.tarjeta("Modelos de IA en palabras simples",
+                   "✦ Qué pregunta responde cada modelo, cómo llega a su opinión, qué tan confiable es y cuándo dudar",
                    ayuda=ia.desc("general")):
         fichas = ia.t("modelo")
         if fichas.empty:
             ia.sin_modelos()
         else:
-            st.caption(f"Entrenados el {fichas['entrenado'].iloc[0].replace('T', ' a las ')} con corte "
-                       f"{fichas['fecha_corte'].iloc[0]}. Se reentrenan solos cuando cambian los datos o la fecha de corte.")
+            ent = pd.Timestamp(fichas["entrenado"].iloc[0])
+            st.caption(f"Revisados por última vez el {ent:%d/%m/%Y} a las {ent:%H:%M} con datos al "
+                       f"{c.fecha_txt(fichas['fecha_corte'].iloc[0])}. Se vuelven a entrenar solos cada vez que llegan datos nuevos. "
+                       "Ninguno decide por el equipo: ordenan y explican para que la decisión sea más informada.")
             filas = []
             for f in fichas.itertuples():
-                dec = 0 if f.valor is not None and abs(f.valor) >= 10 else 2
-                filas.append({"n": f.nombre, "p": f.pestanas, "m": f.metrica, "v": ia._num(f.valor, dec),
-                              "e": c.chip(f.estado if len(f.estado) < 12 else "En espera",
-                                          "OK" if f.estado == "Activo" else "Alerta")})
-            c.tabla_html(filas, [("Modelo", ("n", "p"), "texto"), ("Métrica", "m", "texto"), ("Valor", "v", "num"),
-                                 ("Estado", "e", "html")])
+                ex = ia.explicacion(f.modelo)
+                activo = f.estado == "Activo"
+                filas.append({"n": f.nombre, "q": ex.get("pregunta", f.objetivo), "c": ex.get("confianza") or "—",
+                              "e": c.chip("Activo" if activo else "En espera", "OK" if activo else "Alerta"),
+                              "p": f.pestanas})
+            c.tabla_html(filas, [("Modelo", ("n", "q"), "texto"), ("Qué tan confiable es", "c", "texto"),
+                                 ("Dónde se ve", "p", "texto"), ("Estado", "e", "html")])
+            st.markdown("**Ábrelo para ver cómo piensa cada uno**")
             for f in fichas.itertuples():
-                with st.expander(f"{f.nombre}"):
-                    st.markdown(f"**Para qué:** {f.objetivo}  \n**Método:** {f.metodo}  \n**Datos:** {f.datos}  \n"
-                                f"**Resultado:** {f.metrica} = {ia._num(f.valor, 3)}. {f.linea_base}  \n"
-                                f"**Límites:** {f.limitaciones}  \n**Estado:** {f.estado}  \n**Dónde se ve:** {f.pestanas}")
+                ex = ia.explicacion(f.modelo)
+                with st.expander(f"✦ {f.nombre}"):
+                    if ex.get("pregunta"):
+                        st.markdown(
+                            f"**Qué pregunta responde.** {ex['pregunta']}\n\n"
+                            f"**En qué se fija.** {ex['mira']}\n\n"
+                            f"**Cómo llega a su opinión.** {ex['decide']}\n\n"
+                            f"**Qué tan confiable es.** {ex['confianza'] or 'Aún sin medir.'}\n\n"
+                            f"**Tenlo en cuenta para.** {ex['usar']}\n\n"
+                            f"**Duda de él cuando.** {ex['dudar']}")
+                    else:
+                        st.markdown(f"**Para qué.** {f.objetivo}\n\n**Estado.** {f.estado}")
+                    st.markdown(f'<div class="nota-ia" style="margin-top:.6rem"><b>Detalle técnico</b> · {c._e(f.metodo)} · '
+                                f'Datos: {c._e(f.datos)} · {c._e(f.metrica)} = {ia._num(f.valor, 3)}. {c._e(f.linea_base)} '
+                                f'· Límites: {c._e(f.limitaciones)}</div>', unsafe_allow_html=True)
 
     ident = ia.t("identidad")
     if len(ident):

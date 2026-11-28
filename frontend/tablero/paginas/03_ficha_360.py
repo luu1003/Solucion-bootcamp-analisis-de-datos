@@ -224,6 +224,13 @@ with der, c.tarjeta("Apoyo de IA", "Lo que sugieren los modelos para esta empres
                 + (f'<p style="margin:.4rem 0 .1rem;font-size:.8rem"><b>En contra</b></p><ul style="margin:0;font-size:.8rem">'
                    f'{_lista(r["en_contra"])}</ul>' if r["en_contra"] else ""),
                 unsafe_allow_html=True)
+            lectura = {"Probable": "suele renovar: mantén la relación y pide referidos.",
+                       "Incierta": "puede ir para cualquier lado: conviene una conversación de valor antes del vencimiento.",
+                       "En riesgo": "se parece más a las que no renovaron: priorízala y ataca los factores en contra."}
+            st.markdown(f'<p style="font-size:.78rem;margin:.5rem 0 .2rem"><b>Cómo leerlo:</b> {r["banda"]} — '
+                        f'{lectura.get(r["banda"], "")} El porcentaje sale de compararla con las 503 empresas que ya '
+                        'decidieron en el último año. Si sabes algo que los datos no muestran (cambio de gerente, una queja, '
+                        'recorte de presupuesto), tu criterio pesa más.</p>', unsafe_allow_html=True)
             ia.nota("renovacion")
         acc = ia.t("accion")
         a = acc[acc["empresa_id"] == emp_id] if len(acc) else acc

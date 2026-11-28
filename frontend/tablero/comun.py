@@ -121,7 +121,19 @@ header[data-testid="stHeader"] {{ background: transparent; }}
 [data-testid="stNavSectionHeader"] * {{ color: {C['cian_claro']} !important; }}
 [data-testid="stSidebarNavSeparator"] {{ border-color: rgba(255,255,255,.2); }}
 [data-testid="stSidebarHeader"] {{ padding-top: 1.4rem; padding-bottom: .4rem; }}
+div[class*="st-key-atajo_importar"] a {{ background: {C['naranja_accion']}; border-radius: 999px; justify-content: center;
+  padding: .45rem .9rem !important; box-shadow: 0 6px 16px rgba(0,0,0,.18); }}
+div[class*="st-key-atajo_importar"] a:hover {{ background: {C['naranja_texto']}; }}
+div[class*="st-key-atajo_importar"] a span, div[class*="st-key-atajo_importar"] a p {{ color:#fff !important; font-weight:600 !important; }}
 [data-testid="stSidebarHeader"] img, [data-testid="stLogo"] {{ height: 2.9rem !important; max-width: 9rem; }}
+/* Menú escondido: el logo a color queda en una barra superior propia y el contenido empieza debajo de ella */
+.stApp:has([data-testid="stSidebar"][data-collapsed="true"]) header[data-testid="stHeader"],
+.stApp:has([data-testid="stSidebar"][aria-expanded="false"]) header[data-testid="stHeader"] {{
+  background: {C['menta']}; border-bottom: 1px solid rgba(91,0,217,.08); }}
+[data-testid="stHeaderLogo"] {{ height: 2rem !important; max-width: 7rem; margin-left: .4rem; }}
+.stApp:has([data-testid="stSidebar"][data-collapsed="true"]) [data-testid="stMainBlockContainer"],
+.stApp:has([data-testid="stSidebar"][aria-expanded="false"]) [data-testid="stMainBlockContainer"] {{
+  padding-top: 4.2rem !important; }}
 [data-testid="stSidebar"] [data-testid="stExpander"] details {{ background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); border-radius: 16px; }}
 [data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {{ color: #fff; }}
 [data-testid="stSidebar"] [data-baseweb="select"] > div, [data-testid="stSidebar"] [data-baseweb="input"] {{ background: #fff; border-radius: 12px; }}
@@ -224,6 +236,11 @@ div[data-testid="stLayoutWrapper"] > div[data-testid="stVerticalBlock"][class*="
 
 /* ── Panel derecho morado ── */
 div[class*="st-key-panel"] {{ background: {C['morado']}; border-radius: 20px; padding: 1.1rem 1rem 1rem; position: relative; overflow: hidden; }}
+/* El panel morado llena la columna hasta abajo (sin hueco) y su contenido se queda a la vista al desplazarse */
+div[data-testid="stColumn"]:has(> div[data-testid="stVerticalBlock"] > div[data-testid="stLayoutWrapper"]:last-child > div[class*="st-key-panel"]) > div[data-testid="stVerticalBlock"] {{ height: 100%; }}
+div[data-testid="stLayoutWrapper"]:last-child:has(> div[class*="st-key-panel"]) {{ flex: 1 1 auto; background: {C['morado']};
+  border-radius: 20px; }}
+div[data-testid="stLayoutWrapper"]:last-child > div[class*="st-key-panel"] {{ position: sticky; top: .75rem; align-self: flex-start; flex: 0 0 auto !important; height: auto !important; }}
 div[class*="st-key-panel"] div[class*="st-key-tarjeta"] {{ border-radius: 16px !important; padding: .9rem 1rem .8rem !important; }}
 div[class*="st-key-panel"] .stMarkdown p, div[class*="st-key-panel"] label {{ color: #fff; }}
 div[class*="st-key-panel"] div[class*="st-key-tarjeta"] .stMarkdown p {{ color: {C['tinta']}; }}
@@ -607,6 +624,10 @@ def barra_filtros():
 def lateral_usuario():
     """Barra lateral: lema, usuario y cierre de sesión (la navegación la pone st.navigation)."""
     with st.sidebar:
+        if "11_importar_datos.py" in PAGINAS_ACTIVAS:
+            with st.container(key="atajo_importar"):
+                st.page_link("paginas/11_importar_datos.py", label="Importar datos", icon=":material/upload_file:",
+                             help="Sube datos nuevos con las plantillas de Excel")
         st.markdown('<p class="lema-lateral">Sentimos el pulso.</p>', unsafe_allow_html=True)
         sesion = st.session_state.get("sesion") or {"nombre": "Equipo ACTHO", "rol": "Dirección Ejecutiva"}
         iniciales = "".join(p[0] for p in sesion["nombre"].split()[:2]).upper() or "A"
@@ -843,7 +864,10 @@ def datos(excluir=()):
 def estilo():
     st.markdown(CSS, unsafe_allow_html=True)
     try:
-        st.logo(str(Path(__file__).parent / "recursos" / "logo.svg"), size="large")
+        # Con el menú abierto: logo blanco y naranja sobre el morado. Con el menú escondido Streamlit muestra
+        # icon_image en la barra superior, sobre fondo claro: por eso va la versión morada y naranja.
+        st.logo(str(Path(__file__).parent / "recursos" / "logo.svg"), size="large",
+                icon_image=str(Path(__file__).parent / "recursos" / "logo_color.svg"))
     except Exception:  # noqa: BLE001
         pass
 

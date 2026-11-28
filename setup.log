@@ -1,4 +1,4 @@
-setup.py · 2026-11-27 19:56:27 · Python 3.14.0 · macOS-26.6-arm64-arm-64bit-Mach-O
+setup.py · 2026-11-27 20:07:37 · Python 3.14.0 · macOS-26.6-arm64-arm-64bit-Mach-O
 
 
 === ACTHO · Tablero integral de afiliados ===
@@ -14,7 +14,7 @@ setup.py · 2026-11-27 19:56:27 · Python 3.14.0 · macOS-26.6-arm64-arm-64bit-M
 [  OK  ] Semáforo al 2026-11-27: {'Amarillo': 233, 'Rojo': 63, 'Verde': 178}
 [SALTO ] Modelos de IA al día
 [ ...  ] Arrancando el tablero en http://localhost:8501…
-2026-11-27 19:56:30.702 Uvicorn server started on localhost:8501
+2026-11-27 20:07:39.349 Uvicorn server started on localhost:8501
 
   You can now view your Streamlit app in your browser.
 
@@ -31,3 +31,5 @@ setup.py · 2026-11-27 19:56:27 · Python 3.14.0 · macOS-26.6-arm64-arm-64bit-M
    Usuario: admin   ·   Contraseña: actho
    Para detener el tablero: Ctrl+C
 
+/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/paginas/10_planeacion_eventos.py:120: Pandas4Warning: Series.dt.dayofweek is deprecated and will be removed in a future version. Use Series.dt.day_of_week instead.
+  dia_hist = base["fecha"].dt.dayofweek.value_counts()

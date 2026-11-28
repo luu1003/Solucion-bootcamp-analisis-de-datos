@@ -43,6 +43,9 @@ except ModuleNotFoundError as e:  # mensaje claro si falta una librería
 warnings.filterwarnings("ignore")
 
 RAIZ = Path(__file__).resolve().parent.parent
+import sys as _sys  # noqa: E402
+_sys.path.insert(0, str(RAIZ / "src"))
+from importaciones import TIPOS_AGREGAR, archivos_importados  # noqa: E402
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Configuración
@@ -514,20 +517,32 @@ def consolidar_empresas(crm):
 # ──────────────────────────────────────────────────────────────────────────────
 # Eventos y asistencia
 # ──────────────────────────────────────────────────────────────────────────────
-def cargar_eventos(ruta):
+def cargar_eventos(ruta, asignar_ids=False):
+    """Eventos de la hoja de homologación. asignar_ids=True (archivos importados con la plantilla): el N° de evento
+    puede venir vacío; se numeran 1..n y luego se traducen a la numeración de la base (sumar_asistencia_importada)."""
     t = "dim_evento"
-    bruto = pd.read_excel(ruta, sheet_name="HOMOLOGACION OFERTA 2027", header=None)
-    hi = next(i for i in range(8) if str(bruto.iloc[i, 0]).strip().lower().startswith("n° evento"))
+    hojas = pd.ExcelFile(ruta).sheet_names
+    hoja = next((h for h in hojas if "HOMOLOG" in h.upper()), "HOMOLOGACION OFERTA 2027")
+    bruto = pd.read_excel(ruta, sheet_name=hoja, header=None)
+    hi = next(i for i in range(min(8, len(bruto)))
+              if clave(str(bruto.iloc[i, 0])).startswith(("n° evento", "no evento", "n evento", "nº evento")))
     ev = bruto.iloc[hi + 1:, :7].copy()
+    while ev.shape[1] < 7:
+        ev[ev.shape[1]] = np.nan
     ev.columns = ["evento_id", "hoja_origen", "fecha", "nombre", "linea_2027", "experiencia", "modalidad"]
-    ev = ev[pd.to_numeric(ev["evento_id"], errors="coerce").notna()].copy()
+    if asignar_ids:
+        ev = ev[ev["hoja_origen"].notna() & ev["nombre"].notna()].copy()
+        ev["evento_id"] = np.arange(1, len(ev) + 1)
+    else:
+        ev = ev[pd.to_numeric(ev["evento_id"], errors="coerce").notna()].copy()
     ev["evento_id"] = ev["evento_id"].astype(int)
     for c in ["hoja_origen", "nombre", "linea_2027", "experiencia", "modalidad"]:
         ev[c] = ev[c].map(limpiar_texto).replace("", np.nan)
     ev["hoja_origen"] = ev["hoja_origen"].str.upper()
-    ev["fecha"] = pd.to_datetime(ev["fecha"], errors="coerce")
+    ev["fecha"] = ev["fecha"].map(_fecha_plantilla) if asignar_ids else pd.to_datetime(ev["fecha"], errors="coerce")
     registrar(t, "fecha", "Fecha del evento no interpretable", "Queda vacía", ev["fecha"].isna().sum(), "Revisar con ACTHO")
-    ev["fecha_fin"] = ev["fecha"] + pd.to_timedelta(ev["evento_id"].map(DURACION_EXTRA).fillna(0), unit="D")
+    extra = 0 if asignar_ids else ev["evento_id"].map(DURACION_EXTRA).fillna(0)
+    ev["fecha_fin"] = ev["fecha"] + pd.to_timedelta(extra, unit="D")
     rellenar(ev, t, ["experiencia", "linea_2027", "modalidad"], "Sin dato")
     ev["anio"] = ev["fecha"].dt.year
     ev["mes"] = ev["fecha"].dt.month
@@ -572,7 +587,7 @@ def cargar_asistencia(ruta, eventos):
     regs, vacias, sin_evento = [], [], []
     for ws in wb.worksheets:
         nombre = ws.title.strip().upper()
-        if nombre.startswith("GENERAL") or "HOMOLOG" in nombre:
+        if nombre.startswith("GENERAL") or "HOMOLOG" in nombre or nombre in ("INSTRUCCIONES", "LISTAS"):
             continue
         if nombre not in hoja_a_evento:
             sin_evento.append(ws.title)
@@ -614,6 +629,62 @@ def cargar_asistencia(ruta, eventos):
     a = a.sort_values(["evento_id", "empresa_id", "persona_id"]).reset_index(drop=True)
     a.insert(0, "asistencia_id", np.arange(1, len(a) + 1))
     return a
+
+
+def sumar_asistencia_importada(ruta, eventos, asistencia):
+    """Suma un archivo de asistencia importado con la plantilla. Un evento que ya existe (misma fecha y nombre) se
+    reconoce y sus inscritos se suman sin duplicar personas; los eventos nuevos reciben el siguiente N° de evento."""
+    t = "fact_asistencia"
+    ev_i = cargar_eventos(ruta, asignar_ids=True)
+    if ev_i.empty:
+        registrar("dim_evento", "(importación)", f"Archivo importado sin eventos en la homologación: {Path(ruta).name}",
+                  "Se omite", 1, "Revisar con ACTHO")
+        return eventos, asistencia
+    a_i = cargar_asistencia(ruta, ev_i)
+
+    from difflib import SequenceMatcher
+
+    def mismo_evento(f1, n1, f2, n2):
+        """Misma fecha y nombre igual, contenido en el otro (abreviado) o muy parecido."""
+        if pd.isna(f1) or pd.isna(f2) or pd.Timestamp(f1).normalize() != pd.Timestamp(f2).normalize():
+            return False
+        a, b = clave(n1), clave(n2)
+        return bool(a and b) and (a == b or a in b or b in a or SequenceMatcher(None, a, b).ratio() >= 0.8)
+
+    siguiente = int(eventos["evento_id"].max()) + 1 if len(eventos) else 1
+    mapa, nuevos = {}, []
+    conocidos = list(zip(eventos["fecha"], eventos["nombre"], eventos["evento_id"]))
+    for _, r in ev_i.iterrows():
+        igual = next((i for f, n, i in conocidos if mismo_evento(r["fecha"], r["nombre"], f, n)), None)
+        if igual is not None:
+            mapa[r["evento_id"]] = igual
+        else:
+            mapa[r["evento_id"]] = siguiente
+            conocidos.append((r["fecha"], r["nombre"], siguiente))
+            nuevos.append(r.to_dict() | {"evento_id": siguiente})
+            siguiente += 1
+    a_i["evento_id"] = a_i["evento_id"].map(mapa)
+    if nuevos:
+        eventos = pd.concat([eventos, pd.DataFrame(nuevos)], ignore_index=True)
+    informar("dim_evento", "(importación)", f"{Path(ruta).name}: eventos nuevos", len(nuevos))
+    informar("dim_evento", "(importación)", f"{Path(ruta).name}: eventos que ya estaban en la base", len(ev_i) - len(nuevos))
+    informar(t, "(importación)", f"{Path(ruta).name}: inscripciones leídas", len(a_i))
+    a = pd.concat([asistencia.drop(columns="asistencia_id"), a_i.drop(columns="asistencia_id")], ignore_index=True)
+    dup = a.duplicated(["evento_id", "persona_id"], keep="first") & a["persona_id"].notna()
+    registrar(t, "persona_id", f"Inscripción importada que ya estaba registrada ({Path(ruta).name})",
+              "Se conserva una sola inscripción", dup.sum(), "Excluido")
+    a = a[~dup].sort_values(["evento_id", "empresa_id", "persona_id"]).reset_index(drop=True)
+    a.insert(0, "asistencia_id", np.arange(1, len(a) + 1))
+    return eventos, a
+
+
+def _ids_respuesta(df, ruta, col="respuesta_id"):
+    """Respuestas importadas sin ID: se les asigna uno estable a partir del archivo y la fila."""
+    vacio = df[col].isna() | df[col].astype(str).str.strip().isin(["", "nan", "None", "NaN"])
+    if vacio.any():
+        base = re.sub(r"[^A-Za-z0-9]", "", Path(ruta).stem)[-18:]
+        df.loc[vacio, col] = [f"IMP-{base}-{i + 1}" for i in np.flatnonzero(vacio)]
+    return df
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1224,20 +1295,45 @@ def main():
     dim_empresa, membresias = consolidar_empresas(crm)
     eventos = cargar_eventos(ruta["asistencia"])
     asistencia = cargar_asistencia(ruta["asistencia"], eventos)
+    # Datos importados desde el tablero con las plantillas (Datos/9. Importaciones/<tipo>/)
+    importados = {t_: archivos_importados(datos, t_) for t_ in TIPOS_AGREGAR}
+    for f in importados["asistencia"]:
+        eventos, asistencia = sumar_asistencia_importada(f, eventos, asistencia)
 
     enc_pres = cargar_encuesta_evento(ruta["enc_presencial"], "Presencial", "evento_presencial", eventos)
     enc_virt = cargar_encuesta_evento(ruta["enc_virtual"], "Virtual", "evento_virtual", eventos)
     enc_post, temas = cargar_encuesta_post(ruta["enc_post"], eventos)
+    # Respuestas post-evento importadas: si un ID ya existía, gana la versión importada más reciente.
+    imp_post, imp_temas = [], []
+    for f in importados["enc_post"]:
+        e_i, t_i = cargar_encuesta_post(f, eventos)
+        e_i = _ids_respuesta(e_i, f)
+        imp_post.append(e_i)
+        imp_temas.append(t_i)
+    if imp_post:
+        imp = pd.concat(imp_post, ignore_index=True).drop_duplicates("respuesta_id", keep="last")
+        ids_imp = set(imp["respuesta_id"])
+        temas = pd.concat([temas[~temas["respuesta_id"].isin(ids_imp)]] + imp_temas, ignore_index=True)
+        informar("fact_encuesta_evento", "(importación)", "Respuestas post-evento importadas", len(imp))
     temas_pres = pd.concat([enc_pres[["respuesta_id", "temas_solicitados"]], enc_virt[["respuesta_id", "temas_solicitados"]]])
-    encuestas = unificar_encuestas([enc_pres, enc_virt, enc_post], dim_empresa)
+    encuestas = unificar_encuestas(([imp] if imp_post else []) + [enc_pres, enc_virt, enc_post], dim_empresa)
     catalogo = construir_catalogo()
     relacion, declarados = cargar_encuesta_90d(ruta_opc["enc_90d"], catalogo)
+    if importados["enc_90d"]:
+        partes = [cargar_encuesta_90d(f, catalogo) for f in importados["enc_90d"]]
+        rel_i = [_ids_respuesta(r_.copy(), f) for (r_, _), f in zip(partes, importados["enc_90d"])]
+        relacion = pd.concat([relacion] + rel_i, ignore_index=True).drop_duplicates("respuesta_id", keep="last")
+        declarados = pd.concat([declarados] + [u for _, u in partes], ignore_index=True).drop_duplicates()
+        informar("fact_encuesta_relacion", "(importación)", "Respuestas de 90 días importadas", sum(len(r_) for r_ in rel_i))
 
     principal = pd.read_excel(ruta["principal"])
     ids_principal = validar_id(principal.iloc[:, 0], RX_ID_EMPRESA, "dim_persona", "empresa_id").dropna()
     ids_encuesta = pd.concat([encuestas["empresa_id"], relacion["empresa_id"]]).dropna()
     dim_empresa = completar_empresas(dim_empresa, asistencia["empresa_id"].dropna(), ids_encuesta, ids_principal)
     plantilla = cargar_plantilla_uso(ruta_opc["uso_beneficios"], catalogo, set(dim_empresa["empresa_id"]))
+    if importados["uso_beneficios"]:
+        plantilla = pd.concat([plantilla] + [cargar_plantilla_uso(f, catalogo, set(dim_empresa["empresa_id"]))
+                                             for f in importados["uso_beneficios"]], ignore_index=True).drop_duplicates()
     uso = construir_uso_beneficios(asistencia, eventos, dim_empresa, declarados, plantilla, corte)
 
     # Ejecutivas.
