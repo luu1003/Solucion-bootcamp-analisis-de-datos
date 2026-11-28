@@ -41,6 +41,45 @@ def ficha(modelo: str) -> dict:
     return r
 
 
+# Cómo funciona cada modelo, en dos frases, para el ícono ⓘ (al pasar el cursor)
+DESCRIPCION = {
+    "renovacion": "Regresión logística entrenada con 503 empresas cuyo desenlace ya se conoce (renovó o no). Combina "
+                  "antigüedad, tamaño, nivel, región y comunidades con su participación en los 6 meses previos y da una "
+                  "probabilidad de 0 a 100 %.",
+    "perfiles": "k-means agrupa a las afiliadas vigentes según cómo usaron la membresía en 12 meses (asistencias, "
+                "personas, líneas, beneficios y comunidades). Las empresas de un mismo perfil se comportan parecido.",
+    "propension": "Un bosque aleatorio aprende cómo participan las afiliadas y mide de 0 a 100 qué tanto se parece cada "
+                  "no afiliada. No es probabilidad de compra: no hay historia de conversiones.",
+    "temas": "Compara cada comentario con la descripción de los 12 temas de la encuesta (TF-IDF: parecido de palabras) y "
+             "le asigna el más cercano; si ninguno se parece lo suficiente, queda sin tema.",
+    "identidad": "Para encuestas sin empresa o con una dudosa, sugiere la empresa con la que esa misma persona se "
+                 "inscribió a eventos. Se revisa antes de corregir.",
+    "recomendador": "Sugiere beneficios del nivel que la empresa no ha usado en 12 meses y temas que las empresas de su "
+                    "mismo perfil aprovechan y ella aún no.",
+    "accion": "Regla que cruza días al vencimiento, participación reciente y probabilidad de renovar para sugerir el "
+              "siguiente paso de la ejecutiva.",
+    "eventos": "Busca los 5 eventos pasados más parecidos (modalidad, línea, tema, costo, mes y día) y promedia sus "
+               "resultados. El rango sale de cuánto se equivocó al estimar cada evento pasado sin mirarlo.",
+    "altas": "SARIMA: aprende la tendencia y la estacionalidad de las afiliaciones mensuales desde 2019 y las proyecta "
+             "con rangos de 80 % y 95 %.",
+    "vigentes": "Simula 2.000 escenarios: cada vigente renueva o no en su mes de vencimiento según su probabilidad de "
+                "renovar, y se suman las altas esperadas del SARIMA.",
+    "control": "Dibuja límites a 3 errores estándar del promedio histórico; un punto fuera indica algo distinto a la "
+               "variación normal. La banda es más ancha cuando hubo pocas respuestas.",
+    "general": "Modelos entrenados con los datos de cada carga. Ordenan y explican para apoyar la decisión; no deciden "
+               "por el equipo. Fichas completas en Datos y calidad → Modelos de IA.",
+}
+
+
+def desc(modelo: str) -> str:
+    return DESCRIPCION.get(modelo, DESCRIPCION["general"])
+
+
+def info(modelo: str) -> str:
+    """Ícono ⓘ con la explicación corta del modelo (HTML para poner junto a un título o texto)."""
+    return c._icono_ayuda(desc(modelo), "i", "info")
+
+
 def chip(texto: str = "IA") -> str:
     return c.chip(texto, "IA")
 
@@ -58,7 +97,7 @@ def nota(modelo: str, extra: str = ""):
         return
     v = f["valor"]
     dec = 0 if v is not None and (abs(v) >= 10 or float(v).is_integer()) else 2
-    st.markdown(f'<div class="nota-ia">{chip()} &nbsp;<b>{c._e(f["nombre"])}</b> · {c._e(f["metrica"])}: '
+    st.markdown(f'<div class="nota-ia">{chip()} &nbsp;<b>{c._e(f["nombre"])}</b>{info(modelo)} · {c._e(f["metrica"])}: '
                 f'<b>{_num(f["valor"], dec)}</b>{" · " + extra if extra else ""} · '
                 'detalles en <i>Datos y calidad → Modelos de IA</i></div>', unsafe_allow_html=True)
 

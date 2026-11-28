@@ -1,0 +1,33 @@
+setup.py · 2026-11-27 19:56:27 · Python 3.14.0 · macOS-26.6-arm64-arm-64bit-Mach-O
+
+
+=== ACTHO · Tablero integral de afiliados ===
+
+[  OK  ] Python 3.14.0
+[AVISO ] La carpeta .venv del proyecto ya no se usa (el entorno ahora vive en /Users/luchi/Library/Application Support/ACTHO/venv). Puedes borrarla para liberar espacio en iCloud:  rm -rf .venv
+[SALTO ] Entorno virtual ya existe (/Users/luchi/Library/Application Support/ACTHO/venv)
+[SALTO ] Librerías ya instaladas (requirements.txt no cambió)
+[  OK  ] Datos del reto completos (6 archivos)
+[SALTO ] PostgreSQL ya está disponible (localhost:5433/actho)
+[ ...  ] Revisando si los datos cambiaron…
+[SALTO ] Datos al día: ningún archivo cambió desde la última carga
+[  OK  ] Semáforo al 2026-11-27: {'Amarillo': 233, 'Rojo': 63, 'Verde': 178}
+[SALTO ] Modelos de IA al día
+[ ...  ] Arrancando el tablero en http://localhost:8501…
+2026-11-27 19:56:30.702 Uvicorn server started on localhost:8501
+
+  You can now view your Streamlit app in your browser.
+
+  URL: http://localhost:8501
+
+  For better performance, install the Watchdog module:
+
+  $ xcode-select --install
+  $ pip install watchdog
+            
+[  OK  ] Tablero listo en http://localhost:8501
+[  OK  ] Abierto en Google Chrome
+
+   Usuario: admin   ·   Contraseña: actho
+   Para detener el tablero: Ctrl+C
+
