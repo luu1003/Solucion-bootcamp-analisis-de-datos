@@ -72,6 +72,8 @@ with principal:
         x = x[pd.to_datetime(x["fecha_expiracion"]) <= corte + pd.Timedelta(days=365)]
         proy = 100 * x["p_renovar"].mean() if len(x) else None
     c.meta(m1, f"Tasa de renovación ({renov['tipo']})", tasa, c.METAS_2027["renovacion"], renov["nota"], proyeccion=proy,
+           ayuda_proy="Promedio de la probabilidad de renovar (modelo de IA) de las vigentes que vencen en los "
+                      "próximos 12 meses. " + ia.desc("renovacion"),
            chip_=("Neutro", "Sin datos") if tasa is None else
            ("Alerta" if brecha > 0 else "OK", f"{c.fmt(brecha, 1)} pts por debajo" if brecha > 0 else "Sobre la meta"),
            ayuda_=c.ayuda("Tasa de renovación (medida)" if renov["tipo"] == "medida" else "Tasa de renovación (aproximada)"))

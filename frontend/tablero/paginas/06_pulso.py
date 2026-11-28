@@ -92,7 +92,8 @@ with tab2:
     ren = ia.renovacion()
     if len(coef) and len(ren):
         h1, h2 = st.columns([1.2, 1], gap="medium")
-        with h1, c.tarjeta("Qué pesa en la probabilidad de renovar", "✦ Modelo de IA · efecto de cada factor manteniendo los demás fijos"):
+        with h1, c.tarjeta("Qué pesa en la probabilidad de renovar", "✦ Modelo de IA · efecto de cada factor manteniendo los demás fijos",
+                           ayuda=ia.desc("renovacion")):
             d = coef.sort_values("coeficiente")
             d["Etiqueta"] = d["etiqueta"].map(lambda t_: c.partir(t_, 30))
             fig = go.Figure(go.Bar(
@@ -105,7 +106,9 @@ with tab2:
             fig.update_xaxes(title="← baja la probabilidad · sube la probabilidad →")
             c.grafico(fig, 420)
             ia.nota("renovacion")
-        with h2, c.tarjeta("Semáforo frente al modelo", "Empresas vigentes según las dos miradas"):
+        with h2, c.tarjeta("Semáforo frente al modelo", "Empresas vigentes según las dos miradas",
+                           ayuda="El semáforo usa reglas fijas (vencimiento, uso reciente, satisfacción). El modelo de IA "
+                                 "además pesa antigüedad, tamaño y comunidades. Cruzarlos muestra dónde no coinciden."):
             m = vig.merge(ren[["empresa_id", "banda"]], on="empresa_id")
             m["Riesgo"] = m["semaforo"].map(c.SEM_TXT)
             tab = pd.crosstab(m["Riesgo"], m["banda"]).reindex(index=c.ORDEN_RIESGO, columns=ia.ORDEN_BANDA, fill_value=0)

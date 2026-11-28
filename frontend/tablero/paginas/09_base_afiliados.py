@@ -170,7 +170,7 @@ with lateral, c.panel():
     fv = ia.ficha("vigentes")
     if fv:
         d_ = fv["detalle"]
-        items.append(f"<b>✦ Si nada cambia: {c.fmt(fv['valor'])} vigentes a dic-2027</b><br><span>De las "
+        items.append(f"<b>✦ Si nada cambia: {c.fmt(fv['valor'])} vigentes a dic-2027</b>{ia.info('vigentes')}<br><span>De las "
                      f"{c.fmt(d_.get('vencen_2026'))} que vencen antes de 2027 se espera que renueve el "
                      f"{c.fmt(100 * (d_.get('renov_esperada_2026') or 0), 0)} %. Subir la renovación es la palanca "
                      "más grande del crecimiento.</span>")

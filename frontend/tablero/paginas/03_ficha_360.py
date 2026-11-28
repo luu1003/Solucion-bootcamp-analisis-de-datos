@@ -206,7 +206,7 @@ def _lista(txt):
     return "".join(f"<li>{c._e(x)}</li>" for x in str(txt).split(" · ") if x and x != "nan")
 
 
-with der, c.tarjeta("Apoyo de IA", "Lo que sugieren los modelos para esta empresa"):
+with der, c.tarjeta("Apoyo de IA", "Lo que sugieren los modelos para esta empresa", ayuda=ia.desc("general")):
     if not ia.hay():
         ia.sin_modelos()
     else:
@@ -217,7 +217,7 @@ with der, c.tarjeta("Apoyo de IA", "Lo que sugieren los modelos para esta empres
             color = ia.BANDA_COLOR.get(r["banda"], c.C["morado"])
             st.markdown(
                 f'<div style="display:flex;align-items:baseline;gap:.6rem"><span style="font-size:2rem;font-weight:700;'
-                f'color:{color}">{100 * r["p_renovar"]:.0f} %</span><span>probabilidad de renovar</span></div>'
+                f'color:{color}">{100 * r["p_renovar"]:.0f} %</span><span>probabilidad de renovar{ia.info("renovacion")}</span></div>'
                 f'{ia.chip(r["banda"])}'
                 + (f'<p style="margin:.5rem 0 .1rem;font-size:.8rem"><b>A favor</b></p><ul style="margin:0;font-size:.8rem">'
                    f'{_lista(r["a_favor"])}</ul>' if r["a_favor"] else "")

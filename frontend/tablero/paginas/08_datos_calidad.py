@@ -173,7 +173,8 @@ with izq:
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                help="Llénala cada mes y guárdala en Datos/8. Uso de beneficios/uso_beneficios.xlsx")
 
-    with c.tarjeta("Modelos de IA", "✦ Qué hace cada modelo, con qué datos, qué tan bien funciona y sus límites"):
+    with c.tarjeta("Modelos de IA", "✦ Qué hace cada modelo, con qué datos, qué tan bien funciona y sus límites",
+                   ayuda=ia.desc("general")):
         fichas = ia.t("modelo")
         if fichas.empty:
             ia.sin_modelos()
@@ -196,10 +197,12 @@ with izq:
 
     ident = ia.t("identidad")
     if len(ident):
-        with c.tarjeta("Cruces por revisar", "✦ Personas y empresas que el modelo de identidad sugiere corregir"):
+        with c.tarjeta("Cruces por revisar", "✦ Personas y empresas que el modelo de identidad sugiere corregir",
+                       ayuda=ia.desc("identidad")):
             k = c.fila(2)
             c.kpi(k[0], "Encuestas con empresa sugerida", c.fmt(ident["respuesta_id"].notna().sum()),
-                  "La empresa se completó o corrigió con la asistencia de esa persona", chip_=("IA", "Identidad"))
+                  "La empresa se completó o corrigió con la asistencia de esa persona", chip_=("IA", "Identidad"),
+                  ayuda_=ia.desc("identidad"))
             c.kpi(k[1], "Personas en varias empresas", c.fmt(ident["respuesta_id"].isna().sum()),
                   "Cambio de empleo o error de digitación: revisar en Zoho")
             c.tabla_df(ident.rename(columns={"respuesta_id": "Respuesta", "persona_id": "Persona",

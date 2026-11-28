@@ -174,7 +174,8 @@ with izq:
 
     ctrl = ia.t("control")
     if len(ctrl):
-        with c.tarjeta("¿Algo se salió de lo normal?", "✦ Gráficos de control: puntos fuera de los límites merecen revisión"):
+        with c.tarjeta("¿Algo se salió de lo normal?", "✦ Gráficos de control: puntos fuera de los límites merecen revisión",
+                       ayuda=ia.desc("control")):
             t1, t2 = st.tabs(["Satisfacción por evento", "NPS por mes"])
             for tab_, serie, eje, fmt_ in ((t1, "satisfaccion_evento", "Satisfacción (1 a 5)", ".2f"),
                                            (t2, "nps_mensual", "NPS", ".0f")):
@@ -220,7 +221,9 @@ with der, c.panel():
         fig.update_yaxes(title="")
         fig.update_xaxes(title="")
         fig.update_layout(bargap=0.3)
-        c.grafico(fig, 380, "Temas para próximos espacios" + (" · ✦ leídos con IA de todos los comentarios" if len(dem) else ""))
+        c.grafico(fig, 380, "Temas para próximos espacios")
+        if len(dem):
+            st.markdown(f'<div class="nota-ia">{ia.chip()} &nbsp;Temas leídos con IA de todos los comentarios{ia.info("temas")}</div>', unsafe_allow_html=True)
     gusto = r["lo_que_gusto"].dropna()
     gusto = gusto[gusto.str.len() > 15]
     mejora = r["a_mejorar"].dropna()

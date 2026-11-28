@@ -62,14 +62,16 @@ with der:
     k = c.fila(4)
     rango = f"Rango probable (80 %): {c.fmt(r.get('li80'))} a {c.fmt(r.get('ls80'))}"
     c.kpi(k[0], "Inscritos esperados", c.fmt(r["inscritos"]), rango, oscuro=True, chip_=("IA", "Simulación"),
-          ayuda_="Promedio ponderado de los 5 eventos más parecidos. El rango sale de los errores al estimar cada "
-                 "evento pasado sin mirarlo.")
+          ayuda_=ia.desc("eventos"))
     c.kpi(k[1], "Afiliados entre inscritos", c.fmt(r["pct_afiliados"], 0, " %"),
-          "Parte de inscritos de empresas afiliadas vigentes", chip_=("IA", "Eventos parecidos"))
+          "Parte de inscritos de empresas afiliadas vigentes", chip_=("IA", "Eventos parecidos"),
+          ayuda_="Promedio, ponderado por parecido, del % de inscritos afiliados en los 5 eventos más parecidos.")
     c.kpi(k[2], "Satisfacción esperada", c.fmt(r["satisfaccion"], 2) if r["satisfaccion"] else "—",
-          "Promedio 1 a 5 de las encuestas de los eventos parecidos", chip_=("IA", "Eventos parecidos"))
+          "Promedio 1 a 5 de las encuestas de los eventos parecidos", chip_=("IA", "Eventos parecidos"),
+          ayuda_="Promedio, ponderado por parecido, de la satisfacción (1 a 5) en los eventos parecidos que tuvieron encuesta.")
     c.kpi(k[3], "Empresas distintas", c.fmt(r["empresas"]), "Empresas que suelen inscribirse en eventos así",
-          chip_=("IA", "Eventos parecidos"))
+          chip_=("IA", "Eventos parecidos"),
+          ayuda_="Promedio, ponderado por parecido, de las empresas distintas inscritas en los eventos parecidos.")
     ia.nota("eventos")
     if cupo:
         if cupo < (r.get("li80") or 0):
@@ -79,7 +81,8 @@ with der:
             st.info(f"El cupo de {c.fmt(cupo)} está muy por encima de lo esperado: o se refuerza la convocatoria o "
                     "se reserva un espacio más pequeño.", icon=":material/event_seat:")
 
-    with c.tarjeta("Cómo se compara con los eventos parecidos", "Los 5 eventos en los que se basa la estimación"):
+    with c.tarjeta("Cómo se compara con los eventos parecidos", "Los 5 eventos en los que se basa la estimación",
+                   ayuda=ia.desc("eventos")):
         v = vec.sort_values("inscritos").copy()
         v["Etiqueta"] = v["nombre"].map(lambda n: c.partir(n, 46))
         fig = go.Figure()
@@ -146,7 +149,8 @@ with der:
 # ──────────────────────────────────────────────────────────────────────────────
 d1, d2 = st.columns([1.6, 1], gap="medium")
 with d1, c.tarjeta("Lo que piden frente a lo que ofrecemos",
-                   "% de solicitudes en encuestas y % de eventos de 2026 por tema · el tema elegido resaltado"):
+                   "% de solicitudes en encuestas y % de eventos de 2026 por tema · el tema elegido resaltado",
+                   ayuda=ia.desc("temas")):
     dd = demanda[demanda["tema"] != "General / tendencias"].sort_values("pct_demanda")
     dd["Etiqueta"] = dd["tema"].map(lambda t_: c.partir(t_, 34))
     opac = [1 if t_ == tema else 0.35 for t_ in dd["tema"]]
@@ -187,7 +191,9 @@ with d2, c.panel():
 # ──────────────────────────────────────────────────────────────────────────────
 # 3. Convocatoria
 # ──────────────────────────────────────────────────────────────────────────────
-with c.tarjeta("Convocatoria sugerida", "Personas con interés en el tema que autorizaron el uso de sus datos"):
+with c.tarjeta("Convocatoria sugerida", "Personas con interés en el tema que autorizaron el uso de sus datos",
+               ayuda="Interés = eventos del tema a los que asistió + 2 × veces que lo pidió en encuestas (tema leído con IA). "
+                     "Primero quienes trabajan en afiliadas con baja probabilidad de renovar."):
     f1, f2, f3 = st.columns([2, 1.2, 1])
     niveles = sorted(interes["nivel_cargo"].dropna().unique()) if not interes.empty else []
     publico = f1.multiselect("Público objetivo (nivel de cargo)", niveles,
@@ -212,7 +218,7 @@ with c.tarjeta("Convocatoria sugerida", "Personas con interés en el tema que au
     c.kpi(k[0], "Personas a convocar", c.fmt(len(conv)), "Con interés en el tema y autorización de datos")
     c.kpi(k[1], "Empresas", c.fmt(conv["empresa_id"].nunique()), "Empresas distintas en la lista")
     c.kpi(k[2], "De afiliadas en riesgo", c.fmt((conv["banda"] == "En riesgo").sum()),
-          "Invitarlas ayuda a la renovación", chip_=("IA", "Prob. de renovar"))
+          "Invitarlas ayuda a la renovación", chip_=("IA", "Prob. de renovar"), ayuda_=ia.desc("renovacion"))
     c.kpi(k[3], "No afiliadas", c.fmt((conv["es_afiliada"] == 0).sum()), "Oportunidad de afiliación")
     vista = conv.rename(columns={"persona_id": "Persona", "empresa_id": "Empresa", "nivel_cargo": "Cargo",
                                  "asistencias": "Eventos del tema", "pedidos": "Lo pidió en encuestas",

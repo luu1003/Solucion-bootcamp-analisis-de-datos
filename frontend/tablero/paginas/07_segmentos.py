@@ -83,7 +83,9 @@ with der, c.panel("Segmentos", "A quién dirigir cada mensaje"):
 # ──────────────────────────────────────────────────────────────────────────────
 import ia  # noqa: E402
 
-with c.tarjeta("Segmentos con apoyo de IA", "✦ Listas armadas con los modelos: perfil de uso, interés por tema y parecido con afiliadas"):
+with c.tarjeta("Segmentos con apoyo de IA", "✦ Listas armadas con los modelos: perfil de uso, interés por tema y parecido con afiliadas",
+               ayuda="Perfil de uso: " + ia.desc("perfiles") + " Interés por tema: asistencias a eventos del tema + "
+                     "lo pedido en encuestas. Parecido con afiliadas: " + ia.desc("propension")):
     if not ia.hay():
         ia.sin_modelos()
     else:

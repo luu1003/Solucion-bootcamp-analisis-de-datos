@@ -22,7 +22,7 @@ semaforos = f2.multiselect("Riesgo", ["Rojo", "Amarillo", "Verde"], placeholder=
 venc = f3.multiselect("Vencimiento", ["Vencida", "0-30 días", "31-60 días", "61-90 días", "Más de 90 días", "Sin fecha"],
                       placeholder="Todos", key="dir_venc")
 perfiles_sel = f5.multiselect("Perfil ✦ IA", sorted(e["perfil"].dropna().unique()), placeholder="Todos", key="dir_perfil",
-                              help="Grupo de empresas con una forma parecida de usar la membresía (k-means)")
+                              help=ia.desc("perfiles"))
 buscar = f4.text_input("Buscar código", placeholder="EMP-0123", key="dir_buscar")
 
 if universo == "Vigentes":
@@ -72,10 +72,10 @@ with izq, c.tarjeta():
             "semaforo": st.column_config.TextColumn("Riesgo"),
             "puntaje_riesgo": st.column_config.ProgressColumn("Puntaje", min_value=0, max_value=9, format="%d", width="small"),
             "p_renovar": st.column_config.ProgressColumn("✦ Prob. renovar", min_value=0, max_value=1, format="percent",
-                                                         help="Modelo de IA: probabilidad de renovar (regresión logística)"),
-            "perfil": st.column_config.TextColumn("✦ Perfil", help="Perfil de uso de la membresía (k-means)"),
+                                                         help=ia.desc("renovacion")),
+            "perfil": st.column_config.TextColumn("✦ Perfil", help=ia.desc("perfiles")),
             "propension": st.column_config.ProgressColumn("✦ Parecido con afiliadas", min_value=0, max_value=100,
-                                                          format="%d", help="Qué tanto se parece a las afiliadas (0-100)"),
+                                                          format="%d", help=ia.desc("propension")),
             "nivel_2027": st.column_config.TextColumn("Nivel", width="small"), "tipo_membresia": "Tipo", "estado_membresia": "Estado",
             "ejecutiva": "Ejecutiva", "sector": "Sector", "ciudad": "Ciudad",
             "dias_a_vencer": st.column_config.NumberColumn("Días a vencer", format="%d"),
@@ -105,10 +105,10 @@ with der, c.panel():
             f"<b>Por qué:</b> <span>{emp['motivos_riesgo'] or 'Sin alertas'}</span>",
         ]
         if pd.notna(emp.get("p_renovar")):
-            items.append(f"<b>✦ IA: {100 * emp['p_renovar']:.0f} % de probabilidad de renovar</b><br>"
+            items.append(f"<b>✦ IA: {100 * emp['p_renovar']:.0f} % de probabilidad de renovar</b>{ia.info('renovacion')}<br>"
                          f"<span>{emp['perfil'] or ''}{' · a favor: ' + emp['a_favor'] if emp['a_favor'] else ''}</span>")
         elif pd.notna(emp.get("propension")):
-            items.append(f"<b>✦ IA: parecido con afiliadas {emp['propension']:.0f}/100</b><br>"
+            items.append(f"<b>✦ IA: parecido con afiliadas {emp['propension']:.0f}/100</b>{ia.info('propension')}<br>"
                          "<span>Candidata a propuesta de afiliación</span>")
         c.pulso(items, titulo="Vista rápida", lema="Sugerencia de Pulso según su riesgo")
         if c.pagina_activa("03_ficha_360.py") and st.button("Abrir ficha 360°", type="primary", **c.ancho(st.button)):

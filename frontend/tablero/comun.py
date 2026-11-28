@@ -138,10 +138,16 @@ header[data-testid="stHeader"] {{ background: transparent; }}
 /* ── Encabezado de página ── */
 .titulo {{ font-size: 1.75rem !important; font-weight: 700 !important; color: {C['tinta']} !important; margin: 0 !important; line-height: 1.15 !important; letter-spacing: -.01em; }}
 .subtitulo {{ color: {C['gris']} !important; margin: .2rem 0 0 !important; font-size: .9rem !important; }}
-.pildoras {{ display:flex; gap:.5rem; flex-wrap:wrap; justify-content:flex-end; padding-top: .3rem; }}
-.pildora {{ display:inline-flex; align-items:center; gap:.45rem; border-radius: 999px; padding: .42rem .9rem .42rem .7rem;
-  font-size: .72rem; font-weight: 500; letter-spacing: .02em; text-transform: uppercase; background: #fff;
+.pildoras {{ display:flex; gap:.4rem; flex-wrap:nowrap; justify-content:flex-end; padding-top: .35rem; }}
+.pildora {{ position: relative; display:inline-flex; align-items:center; gap:.38rem; border-radius: 999px;
+  padding: .3rem .7rem .3rem .55rem; font-size: .7rem; font-weight: 500; background: #fff; cursor: default;
   border: 1px solid {C['linea']}; color: {C['tinta']}; white-space: nowrap; }}
+.pildora[data-tip]:hover::after, .pildora[data-tip]:focus::after {{ content: attr(data-tip); position:absolute; right:0;
+  top: calc(100% + 6px); width: 240px; white-space: normal; background:{C['tinta']}; color:#fff; font-size:.72rem;
+  font-weight:400; line-height:1.4; padding:.5rem .65rem; border-radius:8px; z-index:1000; box-shadow:0 6px 18px rgba(0,0,0,.18); }}
+.frescura {{ color: {C['gris']} !important; font-size: .74rem !important; margin: .35rem 0 0 !important; }}
+.frescura b {{ color: {C['tinta']}; font-weight: 600; }}
+.frescura .revisar {{ color: {C['naranja_texto']}; font-weight: 600; }}
 .pildora b {{ font-weight: 700; }}
 .pildora i {{ width: 9px; height: 9px; border-radius: 50%; display:inline-block; background: {C['gris']}; }}
 .pildora.ok i {{ background: {C['cian_graf']}; }} .pildora.alerta i {{ background: {C['naranja']}; }}
@@ -315,11 +321,17 @@ div[class*="st-key-gi_"] .nsewdrag, div[class*="st-key-gi_"] .pielayer path, div
   border-radius:50%; background:{C['lavanda']}; color:{C['morado']}; font-size:.62rem; font-weight:700; cursor:help;
   vertical-align: middle; position: relative; text-transform:none; letter-spacing:0; }}
 .kpi.oscuro .ayuda {{ background: rgba(255,255,255,.2); color:#fff; }}
+.ayuda.info {{ background:#E3F6FA; color:#075E70; font-style:italic; font-family: Georgia, serif; font-weight:700;
+  text-transform:none; letter-spacing:0; vertical-align: middle; }}
+.cabeza h3 .ayuda {{ font-size:.72rem; }}
+.ayuda.info:hover::after, .ayuda.info:focus::after {{ font-style:normal; font-family: inherit; font-weight:400;
+  text-transform:none; letter-spacing:0; width: 260px; white-space: normal; text-align:left; font-family: 'Poppins', sans-serif; }}
 .ayuda:hover::after, .ayuda:focus::after {{ content: attr(data-tip); position:absolute; left:50%; top:22px; transform:translateX(-50%);
   width: 260px; background:{C['morado_900']}; color:#fff; font-size:.74rem; font-weight:400; line-height:1.4;
   padding:.6rem .7rem; border-radius:10px; z-index:1000; text-align:left; white-space:normal; box-shadow:0 8px 24px rgba(43,10,107,.25); }}
-div[class*="st-key-acciones_encabezado"] {{ display:flex; justify-content:flex-end; margin-top:.35rem; }}
-div[class*="st-key-acciones_encabezado"] [data-testid="stHorizontalBlock"] {{ justify-content:flex-end; }}
+div[class*="st-key-acciones_encabezado"] {{ display:flex; justify-content:flex-start; margin-top:.55rem; }}
+div[class*="st-key-acciones_encabezado"] [data-testid="stHorizontalBlock"] {{ justify-content:flex-start; }}
+div[class*="st-key-acciones_encabezado"] [data-testid="stElementContainer"] {{ width:auto !important; }}
 
 /* ── Accesibilidad: foco visible al navegar con teclado (WCAG 2.4.7) ── */
 a:focus-visible, button:focus-visible, [role="tab"]:focus-visible, input:focus-visible, [tabindex]:focus-visible {{
@@ -854,25 +866,56 @@ def _e(t) -> str:
     return html.escape(str(t))
 
 
+def pildoras_negocio() -> list:
+    """Tres señales del negocio para el encabezado (toda la base, sin filtros): cartera vigente, renovación
+    frente a la meta y renovaciones de los próximos 60 días. Cada una trae su explicación al pasar el cursor."""
+    e = empresas()
+    corte = pd.Timestamp(parametros()["fecha_corte"])
+    vig = e[e["es_vigente"] == 1]
+    nuevas = int((pd.to_datetime(vig["fecha_afiliacion"]) >= corte - pd.Timedelta(days=30)).sum())
+    ren = tasa_renovacion(e)
+    tasa, meta = ren.get("tasa"), METAS_2027["renovacion"]
+    dias = pd.to_numeric(vig["dias_a_vencer"], errors="coerce")
+    vencen = int(((dias >= 0) & (dias <= 60)).sum())
+    return [
+        ("Morado", f"<b>{fmt(len(vig))}</b> afiliadas vigentes",
+         f"Empresas con membresía vigente al corte (incluye las que están en periodo de gracia). "
+         f"{fmt(nuevas)} se afiliaron en los últimos 30 días."),
+        ("OK" if tasa is not None and tasa >= meta else "Alerta",
+         f"Renovación <b>{fmt(tasa, 1, ' %')}</b> · meta {fmt(meta, 0, ' %')}",
+         f"De las membresías que vencieron en los últimos 12 meses, cuántas renovaron ({ren.get('tipo', '')}). "
+         f"La meta 2027 es {fmt(meta, 0, ' %')}."),
+        ("Alerta" if vencen else "OK", f"<b>{fmt(vencen)}</b> vencen en 60 días",
+         "Membresías vigentes que vencen en los próximos 60 días: es el próximo frente de renovación. "
+         "Detalle y contactos en Renovación y retención."),
+    ]
+
+
 def encabezado(titulo: str, subtitulo: str, pildoras: list | None = None, filtros: bool = True, acciones=None):
-    """Componente 'Encabezado de página': título, subtítulo, tres píldoras de estado (tono, texto) y,
-    debajo, la barra de filtros del tablero (filtros=False en páginas de una sola empresa o de datos)."""
+    """Componente 'Encabezado de página': título, subtítulo, frescura de los datos, tres píldoras de negocio
+    (tono, texto[, explicación]) y, debajo, la barra de filtros (filtros=False en páginas de una sola empresa o de datos).
+    acciones: función que dibuja botones (p. ej. Ver en Power BI); van alineados a la izquierda, bajo el título."""
     if pildoras is None:
-        p = parametros()
-        carga = ultima_carga()
-        calidad = consulta("SELECT count(*) AS n FROM actho.reporte_calidad WHERE accion = 'Revisar con ACTHO'")["n"].iloc[0]
-        pildoras = [("Morado", f"Corte <b>{fecha_txt(p['fecha_corte'])}</b>"),
-                    ("OK" if carga is not None else "Neutro",
-                     f"Última carga <b>{fecha_txt(carga) if carga is not None else 'manual'}</b>"),
-                    ("Alerta" if calidad else "OK", f"<b>{calidad}</b> datos por revisar")]
-    izq, der = st.columns([2.4, 2.6])
-    izq.markdown(f'<p class="titulo" role="heading" aria-level="1">{_e(titulo)}</p><p class="subtitulo">{_e(subtitulo)}</p>',
-                 unsafe_allow_html=True)
-    cuerpo = "".join(f'<span class="pildora {TONOS.get(t, "neutro")}"><i aria-hidden="true"></i>{txt}</span>' for t, txt in pildoras)
+        pildoras = pildoras_negocio()
+    p = parametros()
+    carga = ultima_carga()
+    calidad = consulta("SELECT count(*) AS n FROM actho.reporte_calidad WHERE accion = 'Revisar con ACTHO'")["n"].iloc[0]
+    frescura = (f'Datos al <b>{fecha_txt(carga) if carga is not None else "corte manual"}</b> · '
+                f'evaluados al {fecha_txt(p["fecha_corte"])}'
+                + (f' · <span class="revisar">{calidad} registros por revisar</span> en Datos y calidad' if calidad else ""))
+    izq, der = st.columns([2.5, 2.5])
+    with izq:
+        st.markdown(f'<p class="titulo" role="heading" aria-level="1">{_e(titulo)}</p><p class="subtitulo">{_e(subtitulo)}</p>'
+                    f'<p class="frescura">{frescura}</p>', unsafe_allow_html=True)
+        if acciones is not None:
+            with st.container(key="acciones_encabezado"):
+                acciones()
+    cuerpo = ""
+    for pil in pildoras:
+        t, txt = pil[0], pil[1]
+        tip = f' tabindex="0" data-tip="{_e(pil[2])}" aria-label="{_e(pil[2])}"' if len(pil) > 2 and pil[2] else ""
+        cuerpo += f'<span class="pildora {TONOS.get(t, "neutro")}"{tip}><i aria-hidden="true"></i>{txt}</span>'
     der.markdown(f'<div class="pildoras" role="status">{cuerpo}</div>', unsafe_allow_html=True)
-    if acciones is not None:
-        with der, st.container(key="acciones_encabezado"):
-            acciones()
     if filtros:
         barra_filtros()
 
@@ -920,11 +963,13 @@ def _poner(col, contenido: str):
         col.markdown(contenido, unsafe_allow_html=True)
 
 
-def _icono_ayuda(texto: str) -> str:
+def _icono_ayuda(texto: str, simbolo: str = "?", clase: str = "") -> str:
+    """Ícono con explicación al pasar el cursor (o al enfocarlo con el teclado)."""
     if not texto:
         return ""
     t = _e(texto)
-    return f'<span class="ayuda" tabindex="0" role="note" aria-label="{t}" data-tip="{t}">?</span>'
+    return (f'<span class="ayuda{" " + clase if clase else ""}" tabindex="0" role="note" aria-label="{t}" '
+            f'data-tip="{t}">{simbolo}</span>')
 
 
 def kpi(col, etiqueta, valor, nota="", oscuro=False, chip_=None, ayuda_=""):
@@ -934,7 +979,7 @@ def kpi(col, etiqueta, valor, nota="", oscuro=False, chip_=None, ayuda_=""):
                 f'<div class="va">{valor}</div>{ch}<div class="no">{nota}</div></div>')
 
 
-def meta(col, etiqueta, actual, objetivo, nota="", sufijo="%", chip_=None, ayuda_="", proyeccion=None):
+def meta(col, etiqueta, actual, objetivo, nota="", sufijo="%", chip_=None, ayuda_="", proyeccion=None, ayuda_proy=""):
     """proyeccion: valor proyectado por un modelo de IA; se marca sobre la barra con una línea cian."""
     pct = 0 if actual is None or pd.isna(actual) else max(0, min(100, 100 * actual / objetivo))
     ch = chip(chip_[1], chip_[0]) if chip_ else ""
@@ -943,7 +988,8 @@ def meta(col, etiqueta, actual, objetivo, nota="", sufijo="%", chip_=None, ayuda
         pp = max(0, min(100, 100 * proyeccion / objetivo))
         marca = (f'<span title="Proyección IA: {fmt(proyeccion, 1, sufijo)}" style="position:absolute;left:calc({pp:.0f}% - 2px);'
                  f'top:-4px;bottom:-4px;width:4px;border-radius:2px;background:{C["cian_graf"]}"></span>')
-        txt_p = f'<div class="no" style="color:#075E70">✦ Proyección IA: <b>{fmt(proyeccion, 1, sufijo)}</b></div>'
+        txt_p = (f'<div class="no" style="color:#075E70">✦ Proyección IA: <b>{fmt(proyeccion, 1, sufijo)}</b>'
+                 f'{_icono_ayuda(ayuda_proy, "i", "info")}</div>')
     _poner(col, f'<div class="meta"><div class="et-meta">{_e(etiqueta)}{_icono_ayuda(ayuda_)}</div>'
                 f'<div class="fila"><span class="va">{fmt(actual, 1, sufijo)}</span>'
                 f'<span class="obj">meta 2027: {fmt(objetivo, 0, sufijo)}</span> {ch}</div>'
@@ -951,9 +997,10 @@ def meta(col, etiqueta, actual, objetivo, nota="", sufijo="%", chip_=None, ayuda
                 f'<div class="no">{nota}</div>{txt_p}</div>')
 
 
-def cabeza(titulo: str, sub: str | None = None, oscuro=False):
-    """Encabezado de tarjeta: título morado y subtítulo naranja (en panel morado: blanco y cian)."""
-    st.markdown(f'<div class="cabeza{" oscura" if oscuro else ""}"><h3>{_e(titulo)}</h3>'
+def cabeza(titulo: str, sub: str | None = None, oscuro=False, ayuda: str = ""):
+    """Encabezado de tarjeta: título morado y subtítulo naranja (en panel morado: blanco y cian).
+    ayuda: si viene, se agrega un ícono ⓘ con esa explicación junto al título."""
+    st.markdown(f'<div class="cabeza{" oscura" if oscuro else ""}"><h3>{_e(titulo)}{_icono_ayuda(ayuda, "i", "info")}</h3>'
                 + (f"<p>{_e(sub)}</p>" if sub else "") + "</div>", unsafe_allow_html=True)
 
 
@@ -966,13 +1013,13 @@ def reiniciar_contadores():
     _contador_panel["n"] = 0
 
 
-def tarjeta(titulo: str | None = None, sub: str | None = None):
+def tarjeta(titulo: str | None = None, sub: str | None = None, ayuda: str = ""):
     """Tarjeta blanca (radio 20, sin borde) con su encabezado. Lleva una clave para poder estilizarla."""
     _contador_tarjeta["n"] += 1
     cont = st.container(border=True, key=f"tarjeta_{_contador_tarjeta['n']}")
     if titulo:
         with cont:
-            cabeza(titulo, sub)
+            cabeza(titulo, sub, ayuda=ayuda)
     return cont
 
 

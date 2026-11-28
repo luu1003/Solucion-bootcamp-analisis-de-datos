@@ -59,7 +59,7 @@ with izq:
         c.cabeza("Calendario de renovaciones", f"{c.fmt(len(prox))} empresas por contactar · primero las de mayor prioridad")
         orden_ia = prox["p_renovar"].notna().any() and st.toggle(
             "Ordenar por probabilidad de renovar (✦ IA), de menor a mayor", value=True, key="ren_orden_ia",
-            help="Apagado, se ordena por el semáforo de riesgo y la cercanía del vencimiento")
+            help="Apagado, se ordena por el semáforo de riesgo y la cercanía del vencimiento. " + ia.desc("renovacion"))
         prox_o = (prox.sort_values(["p_renovar", "dias_a_vencer"]) if orden_ia
                   else prox.sort_values(["puntaje_riesgo", "dias_a_vencer"], ascending=[False, True]))
         lista = prox_o[["empresa_id", "semaforo", "p_renovar", "ejecutiva", "nivel_2027", "fecha_expiracion", "dias_a_vencer",
@@ -71,8 +71,9 @@ with izq:
                          column_config={
                              "empresa_id": "Empresa", "semaforo": "Riesgo", "ejecutiva": "Ejecutiva",
                              "p_renovar": st.column_config.ProgressColumn("✦ Prob. renovar", min_value=0, max_value=1,
-                                                                          format="percent", width="small"),
-                             "accion": st.column_config.TextColumn("✦ Siguiente paso", width="medium"),
+                                                                          format="percent", width="small",
+                                                                          help=ia.desc("renovacion")),
+                             "accion": st.column_config.TextColumn("✦ Siguiente paso", width="medium", help=ia.desc("accion")),
                              "nivel_2027": st.column_config.TextColumn("Nivel", width="small"),
                              "fecha_expiracion": st.column_config.DateColumn("Vence", format="DD/MM/YYYY"),
                              "dias_a_vencer": st.column_config.NumberColumn("Días", format="%d"),
@@ -178,7 +179,7 @@ with der, c.panel("Retención", "Qué se asocia con quedarse"):
     coef = ia.t("renovacion_coef")
     if len(coef):
         top = coef.head(4)
-        items.append("<b>✦ Lo que más pesa en el modelo</b><br><span>" + " · ".join(
+        items.append(f"<b>✦ Lo que más pesa en el modelo</b>{ia.info('renovacion')}<br><span>" + " · ".join(
             f"{r.etiqueta} ({'+' if r.coeficiente > 0 else '−'})" for r in top.itertuples()) + "</span>")
     items += [
         "<b>Motivos de no renovación</b><br><span>El CRM no registra el motivo del retiro. Se propone capturarlo "
