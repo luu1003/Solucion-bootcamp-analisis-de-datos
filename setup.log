@@ -1,4 +1,4 @@
-setup.py · 2026-11-27 20:07:37 · Python 3.14.0 · macOS-26.6-arm64-arm-64bit-Mach-O
+setup.py · 2026-11-27 20:52:57 · Python 3.14.0 · macOS-26.6-arm64-arm-64bit-Mach-O
 
 
 === ACTHO · Tablero integral de afiliados ===
@@ -10,11 +10,11 @@ setup.py · 2026-11-27 20:07:37 · Python 3.14.0 · macOS-26.6-arm64-arm-64bit-M
 [  OK  ] Datos del reto completos (6 archivos)
 [SALTO ] PostgreSQL ya está disponible (localhost:5433/actho)
 [ ...  ] Revisando si los datos cambiaron…
-[SALTO ] Datos al día: ningún archivo cambió desde la última carga
+[  OK  ] Datos procesados y cargados. Fuentes con cambios: imp_asistencia, imp_enc_90d, imp_enc_post, imp_uso_beneficios
 [  OK  ] Semáforo al 2026-11-27: {'Amarillo': 233, 'Rojo': 63, 'Verde': 178}
-[SALTO ] Modelos de IA al día
+[ ...  ] Entrenando los modelos de IA en segundo plano (aparecen en el tablero al terminar; registro: /Users/luchi/Library/Application Support/ACTHO/modelos_ia.log)
 [ ...  ] Arrancando el tablero en http://localhost:8501…
-2026-11-27 20:07:39.349 Uvicorn server started on localhost:8501
+2026-11-27 20:53:08.231 Uvicorn server started on localhost:8501
 
   You can now view your Streamlit app in your browser.
 
@@ -31,5 +31,115 @@ setup.py · 2026-11-27 20:07:37 · Python 3.14.0 · macOS-26.6-arm64-arm-64bit-M
    Usuario: admin   ·   Contraseña: actho
    Para detener el tablero: Ctrl+C
 
-/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/paginas/10_planeacion_eventos.py:120: Pandas4Warning: Series.dt.dayofweek is deprecated and will be removed in a future version. Use Series.dt.day_of_week instead.
-  dia_hist = base["fecha"].dt.dayofweek.value_counts()
+2026-11-27 20:53:36.958 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/luchi/Library/Application Support/ACTHO/venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 136, in exec_func_with_error_handling
+    result = func()
+  File "/Users/luchi/Library/Application Support/ACTHO/venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 936, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/Inicio.py", line 22, in <module>
+    import comun  # noqa: E402
+    ^^^^^^^^^^^^
+  File "/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/comun.py", line 99
+    /* ── Barra lateral (componente Sidebar) ── */
+       ^
+SyntaxError: invalid character '─' (U+2500)
+2026-11-27 20:53:39.127 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/luchi/Library/Application Support/ACTHO/venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 136, in exec_func_with_error_handling
+    result = func()
+  File "/Users/luchi/Library/Application Support/ACTHO/venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 936, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/Inicio.py", line 22, in <module>
+    import comun  # noqa: E402
+    ^^^^^^^^^^^^
+  File "/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/comun.py", line 99
+    /* ── Barra lateral (componente Sidebar) ── */
+       ^
+SyntaxError: invalid character '─' (U+2500)
+2026-11-27 20:53:39.779 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/luchi/Library/Application Support/ACTHO/venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 136, in exec_func_with_error_handling
+    result = func()
+  File "/Users/luchi/Library/Application Support/ACTHO/venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 936, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/Inicio.py", line 22, in <module>
+    import comun  # noqa: E402
+    ^^^^^^^^^^^^
+  File "/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/comun.py", line 99
+    /* ── Barra lateral (componente Sidebar) ── */
+       ^
+SyntaxError: invalid character '─' (U+2500)
+2026-11-27 20:53:41.599 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/luchi/Library/Application Support/ACTHO/venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 136, in exec_func_with_error_handling
+    result = func()
+  File "/Users/luchi/Library/Application Support/ACTHO/venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 936, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/Inicio.py", line 22, in <module>
+    import comun  # noqa: E402
+    ^^^^^^^^^^^^
+  File "/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/comun.py", line 99
+    /* ── Barra lateral (componente Sidebar) ── */
+       ^
+SyntaxError: invalid character '─' (U+2500)
+2026-11-27 20:53:44.152 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/luchi/Library/Application Support/ACTHO/venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 136, in exec_func_with_error_handling
+    result = func()
+  File "/Users/luchi/Library/Application Support/ACTHO/venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 936, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/Inicio.py", line 22, in <module>
+    import comun  # noqa: E402
+    ^^^^^^^^^^^^
+  File "/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/comun.py", line 99
+    /* ── Barra lateral (componente Sidebar) ── */
+       ^
+SyntaxError: invalid character '─' (U+2500)
+2026-11-27 21:01:20.241 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/luchi/Library/Application Support/ACTHO/venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 136, in exec_func_with_error_handling
+    result = func()
+  File "/Users/luchi/Library/Application Support/ACTHO/venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 936, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/Inicio.py", line 22, in <module>
+    import comun  # noqa: E402
+    ^^^^^^^^^^^^
+  File "/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/comun.py", line 99
+    /* ── Barra lateral (componente Sidebar) ── */
+       ^
+SyntaxError: invalid character '─' (U+2500)
+2026-11-27 21:01:24.067 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/luchi/Library/Application Support/ACTHO/venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 136, in exec_func_with_error_handling
+    result = func()
+  File "/Users/luchi/Library/Application Support/ACTHO/venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 936, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/Inicio.py", line 22, in <module>
+    import comun  # noqa: E402
+    ^^^^^^^^^^^^
+  File "/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/comun.py", line 99
+    /* ── Barra lateral (componente Sidebar) ── */
+       ^
+SyntaxError: invalid character '─' (U+2500)
+2026-11-27 21:01:34.966 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/luchi/Library/Application Support/ACTHO/venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 136, in exec_func_with_error_handling
+    result = func()
+  File "/Users/luchi/Library/Application Support/ACTHO/venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 936, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/Inicio.py", line 22, in <module>
+    import comun  # noqa: E402
+    ^^^^^^^^^^^^
+  File "/Users/luchi/Documents/GitHub/Solucion-bootcamp-analisis-de-datos/frontend/tablero/comun.py", line 99
+    /* ── Barra lateral (componente Sidebar) ── */
+       ^
+SyntaxError: invalid character '─' (U+2500)
